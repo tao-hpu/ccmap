@@ -19,7 +19,7 @@ export const CONFIG_DIR = join(homedir(), ".ccmap");
 export const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 
 const DEFAULTS: Config = {
-  intervalMin: 15,
+  intervalMin: 1440, // once a day — usage is aggregated per-day, so more is pointless
   metric: "tokens",
   weeks: 26,
   theme: "claude",

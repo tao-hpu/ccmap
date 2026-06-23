@@ -11,6 +11,7 @@ export interface ReportData {
 export interface ReportOptions {
   theme?: string;
   origin?: string; // public base URL, for OG tags / badge embed
+  share?: boolean; // include the "Customize & share" embed section (hosted report only)
 }
 
 function fmt(n: number): string {
@@ -55,8 +56,13 @@ function build(){
 }
 function copy(id,btn){navigator.clipboard.writeText($(id).textContent).then(function(){var o=btn.textContent;btn.textContent='✓ copied';setTimeout(function(){btn.textContent=o},1200)})}
 build();
+`;
+
+// Interactive hover layer — always included (works with or without the customizer).
+const TOOLTIP_JS = `
 (function(){
   var tip=document.getElementById('tip');
+  if(!tip)return;
   // Promote every chart <title> to a data-tip on its parent and drop the native
   // <title> (kills the slow grey browser tooltip), then drive one styled box.
   document.querySelectorAll('.card svg title').forEach(function(t){
@@ -505,7 +511,7 @@ ${badge ? `<meta property="og:image" content="${badge}">` : ""}
 
   <div class="card"><h2>Models</h2>${bars(topModels, d.totals.tokens, c)}</div>
 
-  ${shareCard(opts.origin || "https://YOUR-CCMAP-HOST", user)}
+  ${opts.share ? shareCard(opts.origin || "https://YOUR-CCMAP-HOST", user) : ""}
 
   <div id="tip" class="tip"></div>
 
@@ -513,6 +519,6 @@ ${badge ? `<meta property="og:image" content="${badge}">` : ""}
     badge ? ` · <a href="${badge}">badge</a>` : ""
   }</footer>
 </div>
-<script>const BASE=${JSON.stringify(opts.origin || "https://YOUR-CCMAP-HOST")},USER=${JSON.stringify(user)};${SHARE_JS}</script>
+<script>${opts.share ? `const BASE=${JSON.stringify(opts.origin || "https://YOUR-CCMAP-HOST")},USER=${JSON.stringify(user)};${SHARE_JS}` : ""}${TOOLTIP_JS}</script>
 </body></html>`;
 }

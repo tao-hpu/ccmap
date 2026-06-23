@@ -140,7 +140,7 @@ async function handleReport(user: string, url: URL, env: Env): Promise<Response>
   const theme = url.searchParams.get("theme") || "claude";
   const html = renderReport(
     { user, totals: p.totals, byModel: p.byModel, days: p.days },
-    { theme, origin: url.origin }
+    { theme, origin: url.origin, share: true }
   );
   return new Response(html, {
     headers: {

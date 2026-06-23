@@ -378,9 +378,15 @@ async function checkUpdateNotice(cfg: Config) {
   }
 }
 
+function humanInterval(min: number): string {
+  if (min % 1440 === 0) return min / 1440 === 1 ? "day" : `${min / 1440} days`;
+  if (min % 60 === 0) return min / 60 === 1 ? "hour" : `${min / 60}h`;
+  return `${min} min`;
+}
+
 async function cmdStart(cfg: Config) {
-  const min = cfg.intervalMin ?? 15;
-  console.log(`ccmap daemon — pushing every ${min} min. Ctrl-C to stop.`);
+  const min = cfg.intervalMin ?? 1440;
+  console.log(`ccmap daemon — pushing every ${humanInterval(min)}. Ctrl-C to stop.`);
   let first = true;
   const tick = async () => {
     const ts = new Date().toLocaleTimeString();
@@ -445,7 +451,8 @@ Usage:
   ccmap push [--user <name>]       Push aggregates. First run picks a username
                                    (prompts on a terminal; --user / CCMAP_USER to set it)
   ccmap start                      Resident: push on an interval
-  ccmap config [--interval 15] [--metric tokens|cost] [--theme dark|light]
+  ccmap config [--interval <min>] [--metric tokens|cost] [--theme dark|light]
+                                   (--interval is minutes between 'ccmap start' pushes; default 1440 = daily)
   ccmap update                     Self-update to the latest published version
   ccmap version
 
