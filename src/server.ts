@@ -230,7 +230,7 @@ function getResvg(): Promise<any> {
 }
 
 // PNG badge — social cards (X/Twitter, etc.) can't render SVG, so rasterize it.
-async function handlePng(user: string, url: URL, res: ServerResponse): Promise<void> {
+async function handlePng(req: IncomingMessage, user: string, url: URL, res: ServerResponse): Promise<void> {
   if (!USER_RE.test(user)) return send(res, 400, "bad user");
   const raw = kvGet(`user:${user}`);
   if (!raw) return send(res, 404, "not found");
@@ -241,7 +241,7 @@ async function handlePng(user: string, url: URL, res: ServerResponse): Promise<v
   // default → the wide tier-mascot OG card.
   const svg =
     url.searchParams.get("shape") === "portrait"
-      ? renderPortraitCard(data, { theme })
+      ? renderPortraitCard(data, { theme, origin: originOf(req, url) })
       : url.searchParams.get("card") === "badge"
         ? renderSVG(
             daysToMap(p),
@@ -296,7 +296,7 @@ const server = createServer(async (req, res) => {
     if (method === "POST" && path === "/api/push") return await handlePush(req, res);
 
     const pngM = path.match(/^\/u\/([^/]+)\.png$/);
-    if (method === "GET" && pngM) return await handlePng(decodeURIComponent(pngM[1]), url, res);
+    if (method === "GET" && pngM) return await handlePng(req, decodeURIComponent(pngM[1]), url, res);
 
     const m = path.match(/^\/u\/([^/]+)\.svg$/);
     if (method === "GET" && m) return handleBadge(decodeURIComponent(m[1]), url, res);

@@ -4,6 +4,21 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.8] — 2026-06-23
+
+### Added
+- **Scannable QR on the portrait share card.** The downloadable portrait PNG now
+  embeds a crisp QR code (zero-dependency encoder, `src/qr.ts`) linking straight
+  back to the live report — scan it from a phone to open the page. Verified
+  end-to-end (jsQR decode of the rasterized PNG).
+
+### Changed
+- **Cleaner report UI.** Removed all drop-shadows / glow (buttons, tooltip,
+  sticky pill) and the CTA gradient for a flat, calmer look. The "Post on X" and
+  "Download" buttons now share one height and baseline so they line up exactly.
+- The download button is **English-only** ("Download card", with a download
+  glyph) — no more mixed-script label.
+
 ## [0.1.7] — 2026-06-23
 
 ### Added
@@ -114,6 +129,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.8]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.8
 [0.1.7]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.7
 [0.1.6]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.6
 [0.1.5]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.5

@@ -1,4 +1,25 @@
 import { renderSVG, resolveTheme } from "./render.js";
+import { qrMatrix } from "./qr.js";
+
+// Render a URL as a self-contained "scan me" SVG chip: a light rounded card
+// (QR must be dark-on-light to scan reliably) with the QR drawn as <rect>s.
+function qrChip(url: string, x: number, y: number, size: number): string {
+  const m = qrMatrix(url, 1);
+  const n = m.length;
+  const quiet = 2; // modules of margin inside the white card
+  const card = size;
+  const unit = card / (n + quiet * 2);
+  const ox = x + quiet * unit;
+  const oy = y + quiet * unit;
+  const cell = Math.ceil(unit * 100) / 100;
+  let dots = "";
+  for (let r = 0; r < n; r++)
+    for (let col = 0; col < n; col++)
+      if (m[r][col])
+        dots += `<rect x="${(ox + col * unit).toFixed(2)}" y="${(oy + r * unit).toFixed(2)}" width="${cell}" height="${cell}" fill="#0a0a0a"/>`;
+  const rad = Math.round(card * 0.08);
+  return `<rect x="${x}" y="${y}" width="${card}" height="${card}" rx="${rad}" fill="#ffffff"/><g shape-rendering="crispEdges">${dots}</g>`;
+}
 
 // Normalized input shared by CLI (buildPayload) and Worker (PushPayload).
 export interface ReportData {
@@ -118,8 +139,10 @@ function shareCard(base: string, user: string): string {
     <div class="snip"><div class="snip-h"><span>GitHub README · adaptive light/dark ★</span><button onclick="copy('s-pic',this)">copy</button></div><pre><code id="s-pic"></code></pre><div class="note">Follows the viewer's GitHub theme automatically — dark side uses your selected theme above.</div></div>
     <div class="snip"><div class="snip-h"><span>Simple markdown (any host)</span><button onclick="copy('s-md',this)">copy</button></div><pre><code id="s-md"></code></pre></div>
     <div class="snip"><div class="snip-h"><span>Share link (X / anywhere)</span><button onclick="copy('s-url',this)">copy</button></div><pre><code id="s-url"></code></pre>
-      <a id="tweet" class="xbtn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"/></svg>Post on X</a><a id="dl" class="dlbtn" download="ccmap-${user}.png" href="#">⬇ Download card (for X / 朋友圈)</a>
-      <div class="note">「Post on X」unfurls a full image card (your mascot + heatmap), and 「Download」saves a tall portrait PNG to post anywhere. Each share link carries a fresh tag (<code id="cb-note" style="color:var(--accent)"></code>) so caches never go stale. GitHub/Slack/Discord render the SVG badge inline.</div>
+      <div class="share-actions">
+        <a id="tweet" class="xbtn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"/></svg>Post on X</a><a id="dl" class="dlbtn" download="ccmap-${user}.png" href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 19h14"/></svg>Download card</a>
+      </div>
+      <div class="note">Post on X unfurls a full image card (mascot + heatmap); Download saves a tall portrait PNG (with a scannable QR back to your page) for X, stories, or anywhere. Each share link carries a fresh tag (<code id="cb-note" style="color:var(--accent)"></code>) so caches never go stale — GitHub, Slack and Discord render the SVG badge inline.</div>
     </div>
   </div>`;
 }
@@ -450,7 +473,7 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
 
   // heatmap, centered
   const weeks = 53, gcell = 14, ggap = 3, gstep = gcell + ggap;
-  const gw = weeks * gstep, gx = (W - gw) / 2, gy = 940;
+  const gw = weeks * gstep, gx = (W - gw) / 2, gy = 905;
   const byDate = new Map<string, number>(d.days.map((x) => [x.date, x.tokens]));
   const vals = d.days.map((x) => x.tokens).filter((v) => v > 0).sort((a, b) => a - b);
   const q = (p: number) => (vals.length ? vals[Math.min(vals.length - 1, Math.floor(p * vals.length))] : 0);
@@ -472,7 +495,12 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
 
   const cost = `$${Math.round(d.totals.cost).toLocaleString()}`;
   const sub = `${cost} · ${d.totals.streak}-day streak · ${d.days.length} active days`;
-  const goal = next ? `${fmt(next.min - d.totals.tokens)} tokens to ${esc(next.title)}` : "top tier — ascended 🛸";
+  const goal = next ? `${fmt(next.min - d.totals.tokens)} tokens to ${esc(next.title)}` : "top tier — ascended";
+
+  // QR linking back to this page — scan it to open the live report.
+  const base = (opts.origin || "https://ccmap.fim.ai").replace(/\/$/, "");
+  const pageUrl = `${base}/u/${encodeURIComponent(user)}`;
+  const qs = 150, qx = (W - qs) / 2, qy = 1132;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${font}" xml:space="preserve">
   <rect width="${W}" height="${H}" fill="${c.bg}"/>
@@ -486,9 +514,10 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
   <text x="${cx}" y="812" text-anchor="middle" font-size="58" font-weight="700" fill="${c.scale[2]}">${fmt(d.totals.tokens)} tokens</text>
   <text x="${cx}" y="862" text-anchor="middle" font-size="28" fill="${c.sub}">${sub}</text>
   <g>${grid}</g>
-  <text x="${cx}" y="1110" text-anchor="middle" font-size="26" fill="${c.sub}">${goal}</text>
-  <text x="${cx}" y="1210" text-anchor="middle" font-size="32" font-weight="700" fill="${c.text}">Get your own coding heatmap</text>
-  <text x="${cx}" y="1256" text-anchor="middle" font-size="28" fill="${c.scale[2]}">npm i -g @tao-hpu/ccmap  ·  github.com/tao-hpu/ccmap</text>
+  <text x="${cx}" y="1058" text-anchor="middle" font-size="26" fill="${c.sub}">${goal}</text>
+  <text x="${cx}" y="1108" text-anchor="middle" font-size="32" font-weight="700" fill="${c.text}">Get your own coding heatmap</text>
+  ${qrChip(pageUrl, qx, qy, qs)}
+  <text x="${cx}" y="1322" text-anchor="middle" font-size="23" fill="${c.scale[2]}">scan to open · npm i -g @tao-hpu/ccmap</text>
 </svg>`;
 }
 
@@ -596,7 +625,7 @@ ${ogTags}
   .half{flex:1;min-width:240px}
   .sub-h{font-size:11px;color:var(--sub);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;text-align:center}
   .rk-scale{display:flex;justify-content:space-between;font-size:10px;color:var(--sub);margin-top:4px}
-  .tip{position:fixed;z-index:50;pointer-events:none;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:12px;box-shadow:0 6px 22px rgba(0,0,0,.4);opacity:0;transition:opacity .08s;max-width:300px;line-height:1.45}
+  .tip{position:fixed;z-index:50;pointer-events:none;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:12px;opacity:0;transition:opacity .08s;max-width:300px;line-height:1.45}
   .tip.on{opacity:1}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin:18px 0}
   .card h2{font-size:14px;margin:0 0 14px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
@@ -644,20 +673,23 @@ ${ogTags}
   .snip-h span{flex:1}
   .snip-h button,.snip-h a{font:12px inherit;background:none;border:1px solid var(--line);color:var(--accent);border-radius:6px;padding:2px 10px;cursor:pointer;text-decoration:none}
   .note{font-size:11px;color:var(--sub);margin-top:8px;line-height:1.5}
-  .xbtn{display:inline-flex;align-items:center;gap:9px;margin-top:12px;padding:13px 26px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;border:none;border-radius:11px;text-decoration:none;cursor:pointer;box-shadow:0 4px 14px rgba(var(--accent-rgb),.35);transition:transform .12s ease,filter .12s ease}
-  .xbtn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+  .share-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+  .xbtn,.dlbtn{display:inline-flex;align-items:center;justify-content:center;gap:9px;height:48px;padding:0 24px;font-size:15px;font-weight:700;border:1.5px solid transparent;border-radius:11px;text-decoration:none;cursor:pointer;transition:background .12s,filter .12s}
+  .xbtn{background:var(--accent);color:#fff}
+  .xbtn:hover{filter:brightness(1.06)}
   .xbtn svg{width:20px;height:20px;fill:currentColor}
-  .dlbtn{display:inline-flex;align-items:center;gap:8px;margin:12px 0 0 10px;padding:12px 22px;background:transparent;color:var(--accent);font-size:15px;font-weight:700;border:1.5px solid var(--accent);border-radius:11px;text-decoration:none;cursor:pointer;transition:background .12s}
-  .dlbtn:hover{background:rgba(var(--accent-rgb),.12)}
-  .cta{margin:32px 0 8px;padding:28px 26px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,rgba(var(--accent-rgb),.10),var(--card));text-align:center}
+  .dlbtn{background:transparent;color:var(--accent);border-color:var(--accent)}
+  .dlbtn:hover{background:rgba(var(--accent-rgb),.1)}
+  .dlbtn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .cta{margin:32px 0 8px;padding:28px 26px;border:1px solid var(--line);border-radius:16px;background:var(--card);text-align:center}
   .cta-h{font-size:25px;font-weight:800}
   .cta-sub{font-size:14px;color:var(--sub);margin:7px 0 18px}
   .cta-row{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap}
-  .cta-btn{display:inline-flex;align-items:center;padding:13px 26px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;border-radius:11px;text-decoration:none;box-shadow:0 4px 14px rgba(var(--accent-rgb),.35);transition:transform .12s,filter .12s}
-  .cta-btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
-  .cta-code{font:13px ui-monospace,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:11px 16px;color:var(--fg)}
-  .getyours{position:fixed;right:18px;bottom:18px;z-index:50;display:inline-flex;align-items:center;gap:7px;padding:12px 19px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;border-radius:999px;text-decoration:none;box-shadow:0 6px 20px rgba(0,0,0,.4)}
-  .getyours:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .cta-btn{display:inline-flex;align-items:center;justify-content:center;height:48px;padding:0 26px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;border:1.5px solid transparent;border-radius:11px;text-decoration:none;transition:filter .12s}
+  .cta-btn:hover{filter:brightness(1.06)}
+  .cta-code{display:inline-flex;align-items:center;height:48px;font:13px ui-monospace,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:0 16px;color:var(--fg)}
+  .getyours{position:fixed;right:18px;bottom:18px;z-index:50;display:inline-flex;align-items:center;gap:7px;padding:12px 19px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;border-radius:999px;text-decoration:none;border:1px solid rgba(0,0,0,.15)}
+  .getyours:hover{filter:brightness(1.06)}
   @media(max-width:560px){.getyours{right:10px;bottom:10px;padding:10px 15px;font-size:13px}}
   pre{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
   pre::-webkit-scrollbar{height:8px}
