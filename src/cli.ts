@@ -3,6 +3,7 @@ import { writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { userInfo } from "node:os";
+import { createInterface } from "node:readline";
 import { scan, currentStreak, type ScanResult } from "./parse.js";
 import { renderSVG, resolveTheme } from "./render.js";
 import { renderReport } from "./report.js";
@@ -15,13 +16,28 @@ const PKG = "ccmap"; // npm package name — change to "@you/ccmap" if scoped
 // Set this to your deployed Worker (e.g. https://ccmap.fim.ai) before publishing.
 const DEFAULT_ENDPOINT = process.env.CCMAP_ENDPOINT ?? "";
 
+// Public usernames are restricted to a URL-safe slug (they appear in /u/<name>.svg).
+function cleanName(name: string): string {
+  return (name || "").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 39);
+}
+
 function deriveUsername(): string {
   let name = "user";
   try {
     name = userInfo().username || "user";
   } catch {}
-  const clean = name.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 39);
-  return clean || "user";
+  return cleanName(name) || "user";
+}
+
+// Minimal one-line prompt (only used on an interactive TTY).
+function promptLine(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(question, (ans) => {
+      rl.close();
+      resolve(ans.trim());
+    });
+  });
 }
 
 interface ClaimResult {
@@ -258,7 +274,7 @@ async function cmdLogin(args: string[]) {
 }
 
 // One-stop: if not configured, auto-claim a name silently so `ccmap push` just works.
-async function ensureOnboarded(cfg: Config): Promise<Config | null> {
+async function ensureOnboarded(cfg: Config, explicitUser?: string): Promise<Config | null> {
   if (cfg.user && cfg.token && cfg.endpoint) return cfg;
   const endpoint = cfg.endpoint || DEFAULT_ENDPOINT;
   if (!endpoint) {
@@ -266,11 +282,31 @@ async function ensureOnboarded(cfg: Config): Promise<Config | null> {
     console.error("  ccmap login --user <name> --endpoint <url>");
     return null;
   }
-  const user = cfg.user || deriveUsername();
+  // Name precedence: --user flag > CCMAP_USER env > saved config > OS username.
+  const override = cleanName(explicitUser || process.env.CCMAP_USER || "");
+  const fallback = override || cfg.user || deriveUsername();
   const key = cfg.token || randomBytes(24).toString("hex");
-  const res = await claimName(endpoint, user, key);
+
+  // The name is public and permanent (it's in your badge URL, no rename in v0),
+  // so on a first interactive run confirm it up front instead of silently taking
+  // the OS username. Non-TTY (CI, pipes, `start` in background) keeps the default.
+  const interactive = !override && !cfg.user && !!process.stdin.isTTY && !!process.stdout.isTTY;
+  let user = fallback;
+  if (interactive) {
+    console.log("This name is public and goes in your badge URL: <host>/u/<name>.svg");
+    const ans = cleanName(await promptLine(`Pick your ccmap username [${fallback}]: `));
+    user = ans || fallback;
+  }
+
+  let res = await claimName(endpoint, user, key);
+  while (interactive && res.status === 409) {
+    const ans = cleanName(await promptLine(`"${user}" is already taken — try another (blank to give up): `));
+    if (!ans) break;
+    user = ans;
+    res = await claimName(endpoint, user, key);
+  }
   if (res.status === 409) {
-    console.error(`auto-picked name "${user}" is taken. Choose your own once:`);
+    console.error(`name "${user}" is taken. Pick another:`);
     console.error(`  ccmap login --user <name> --endpoint ${endpoint}`);
     return null;
   }
@@ -282,7 +318,9 @@ async function ensureOnboarded(cfg: Config): Promise<Config | null> {
   cfg.endpoint = endpoint;
   cfg.token = key;
   saveConfig(cfg);
-  console.log(`first run — claimed "${user}"  ·  badge ${endpoint.replace(/\/$/, "")}/u/${user}.svg`);
+  const base = endpoint.replace(/\/$/, "");
+  console.log(`✓ claimed "${user}"  ·  badge ${base}/u/${user}.svg`);
+  if (!interactive) console.log(`  not the name you want? change it: ccmap login --user <name>`);
   return cfg;
 }
 
@@ -294,9 +332,12 @@ function postAggregates(base: string, token: string | undefined, payload: unknow
   });
 }
 
-async function cmdPush(cfgIn: Config) {
-  const cfg = await ensureOnboarded(cfgIn);
+async function cmdPush(cfgIn: Config, hint = false, explicitUser?: string) {
+  const cfg = await ensureOnboarded(cfgIn, explicitUser);
   if (!cfg) process.exit(1);
+  if (explicitUser && cleanName(explicitUser) !== cfg.user) {
+    console.log(`note: already configured as "${cfg.user}". To switch names: ccmap login --user ${cleanName(explicitUser)}`);
+  }
   const res = scan({ pricing: cfg.pricing });
   const payload = buildPayload(res, cfg);
   const base = (cfg.endpoint ?? "").replace(/\/$/, "");
@@ -315,6 +356,9 @@ async function cmdPush(cfgIn: Config) {
     console.log(`pushed ${payload.days.length} days · ${res.totalTokens.toLocaleString()} tok → ${base}/api/push`);
     console.log(`badge:  ${base}/u/${cfg.user}.svg`);
     console.log(`report: ${base}/u/${cfg.user}`);
+    if (hint) {
+      console.log(`\n💡 want to embed it in GitHub / X? open the report above — copy-paste\n   snippets (incl. auto light/dark for GitHub) are at the bottom.`);
+    }
     return true;
   } catch (e) {
     console.error(`push error: ${(e as Error).message}`);
@@ -337,10 +381,12 @@ async function checkUpdateNotice(cfg: Config) {
 async function cmdStart(cfg: Config) {
   const min = cfg.intervalMin ?? 15;
   console.log(`ccmap daemon — pushing every ${min} min. Ctrl-C to stop.`);
+  let first = true;
   const tick = async () => {
     const ts = new Date().toLocaleTimeString();
     process.stdout.write(`[${ts}] `);
-    await cmdPush(cfg);
+    await cmdPush(cfg, first);
+    first = false;
   };
   await tick();
   setInterval(tick, min * 60 * 1000);
@@ -396,7 +442,8 @@ Usage:
   ccmap report [--out f.html]      Render a full shareable HTML report locally
   ccmap login --user <name> --endpoint <url> [--invite <code>]
                                    Claim a specific username (optional — push auto-claims).
-  ccmap push                       Push aggregates (first run auto-claims a name)
+  ccmap push [--user <name>]       Push aggregates. First run picks a username
+                                   (prompts on a terminal; --user / CCMAP_USER to set it)
   ccmap start                      Resident: push on an interval
   ccmap config [--interval 15] [--metric tokens|cost] [--theme dark|light]
   ccmap update                     Self-update to the latest published version
@@ -423,7 +470,7 @@ async function main() {
       await cmdLogin(args);
       break;
     case "push":
-      await cmdPush(cfg);
+      await cmdPush(cfg, true, argVal(args, "--user"));
       break;
     case "start":
       await cmdStart(cfg);

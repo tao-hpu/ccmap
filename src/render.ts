@@ -150,7 +150,13 @@ export function renderSVG(
     const fill = lv < 0 ? c.empty : c.scale[lv];
     const x = padX + col * STEP;
     const y = padTop + row * STEP;
-    const tip = v > 0 ? `${key}: ${metric === "cost" ? "$" + v.toFixed(2) : fmt(v) + " tok"}` : `${key}`;
+    let tip = key;
+    if (ds && ds.tokens > 0) {
+      const parts = [`${fmt(ds.tokens)} tok`, `$${ds.cost.toFixed(2)}`];
+      if (ds.bySource) parts.push(`claude ${fmt(ds.bySource.claude)} / codex ${fmt(ds.bySource.codex)}`);
+      if (ds.sessions && ds.sessions.size) parts.push(`${ds.sessions.size} sessions`);
+      tip = `${key} · ${parts.join(" · ")}`;
+    }
     // cascade animates every cell (the grid "grows in"); wave/ember only lit cells
     const animated = anim === "cascade" ? true : anim !== "none" && lv >= 0;
     let delay = 0;

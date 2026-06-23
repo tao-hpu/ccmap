@@ -18,11 +18,16 @@ That's the whole install. Then:
 
 ```bash
 ccmap scan      # see your usage in the terminal — colored heatmap, no upload, no setup
-ccmap push      # claim a name + publish your badge → <host>/u/<you>.svg
+ccmap push      # pick a name + publish your badge → <host>/u/<you>.svg
 ccmap start     # keep it fresh: push every 15 min in the background
 ```
 
 Don't want to install? `npx ccmap@latest scan` runs it once, always latest.
+
+> `scan` / `render` / `report` are fully local and need **no setup**. `push` / `start`
+> publish to a badge service — point at your own with `ccmap login --endpoint <url>`
+> (deploy one in seconds, see [Badge server](#badge-server-cloudflare-worker)). A
+> public hosted endpoint is coming; until then, self-host.
 
 ## Commands
 
@@ -31,7 +36,7 @@ Don't want to install? `npx ccmap@latest scan` runs it once, always latest.
 | `ccmap scan` | Summarize local usage (tokens, est. cost, streak, model mix) + terminal heatmap. No upload. |
 | `ccmap render [--out f.svg] [--theme …] [--anim ember\|wave\|cascade] [--metric tokens\|cost] [--weeks 26]` | Render a heatmap SVG locally. |
 | `ccmap report [--out f.html]` | Render a full shareable HTML report (with a live customizer). |
-| `ccmap push` | Publish your data. First run auto-claims a username — no manual setup. |
+| `ccmap push [--user <name>]` | Publish your data. First run picks a username: on a terminal it **prompts** you (default = your OS name); non-interactively it uses the default. Override with `--user` or the `CCMAP_USER` env var. |
 | `ccmap start` | Resident: push every `interval` minutes (also checks for updates daily). |
 | `ccmap login --user <name> --endpoint <url>` | Optional: pick a specific username / point at your own server. |
 | `ccmap update` | Self-update to the latest published version. |
