@@ -1,6 +1,6 @@
 {
   "name": "@tao-hpu/ccmap",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Coding heatmap for Claude Code + Codex — scan local logs, render a GitHub-style heatmap, push aggregates to a badge endpoint.",
   "type": "module",
   "bin": {
@@ -21,9 +21,20 @@
   },
   "license": "MIT",
   "author": "tao-hpu",
-  "repository": { "type": "git", "url": "git+https://github.com/tao-hpu/ccmap.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tao-hpu/ccmap.git"
+  },
   "homepage": "https://github.com/tao-hpu/ccmap#readme",
-  "keywords": ["claude-code", "codex", "usage", "heatmap", "tokens", "cli", "badge"],
+  "keywords": [
+    "claude-code",
+    "codex",
+    "usage",
+    "heatmap",
+    "tokens",
+    "cli",
+    "badge"
+  ],
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
