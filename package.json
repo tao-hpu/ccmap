@@ -1,5 +1,5 @@
 {
-  "name": "ccmap",
+  "name": "@tao-hpu/ccmap",
   "version": "0.1.0",
   "description": "Coding heatmap for Claude Code + Codex — scan local logs, render a GitHub-style heatmap, push aggregates to a badge endpoint.",
   "type": "module",

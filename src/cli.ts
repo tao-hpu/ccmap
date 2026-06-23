@@ -11,7 +11,7 @@ import type { DayStat } from "./parse.js";
 import { loadConfig, saveConfig, CONFIG_PATH, type Config } from "./config.js";
 
 const VERSION = "0.1.0";
-const PKG = "ccmap"; // npm package name — change to "@you/ccmap" if scoped
+const PKG = "@tao-hpu/ccmap"; // npm package name (scoped; the CLI command is still `ccmap`)
 // Public service URL baked in so newcomers can `ccmap push` with zero setup.
 // Set this to your deployed Worker (e.g. https://ccmap.fim.ai) before publishing.
 const DEFAULT_ENDPOINT = process.env.CCMAP_ENDPOINT ?? "";

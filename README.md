@@ -11,10 +11,10 @@ README or post.
 ## Install
 
 ```bash
-npm i -g ccmap
+npm i -g @tao-hpu/ccmap
 ```
 
-That's the whole install. Then:
+That's the whole install (the command is still just `ccmap`). Then:
 
 ```bash
 ccmap scan      # see your usage in the terminal — colored heatmap, no upload, no setup
@@ -22,7 +22,7 @@ ccmap push      # pick a name + publish your badge → <host>/u/<you>.svg
 ccmap start     # keep it fresh: push every 15 min in the background
 ```
 
-Don't want to install? `npx ccmap@latest scan` runs it once, always latest.
+Don't want to install? `npx @tao-hpu/ccmap@latest scan` runs it once, always latest.
 
 > `scan` / `render` / `report` are fully local and need **no setup**. `push` / `start`
 > publish to a badge service — point at your own with `ccmap login --endpoint <url>`
@@ -58,7 +58,7 @@ in `~/.ccmap/config.json`:
 ## Updating
 
 ```bash
-ccmap update     # self-update to latest (same as `npm i -g ccmap@latest`)
+ccmap update     # self-update to latest (same as `npm i -g @tao-hpu/ccmap@latest`)
 ```
 
 The resident daemon (`ccmap start`) checks npm once a day and prints when a new
@@ -73,8 +73,9 @@ npm version patch         # bump + git tag (patch | minor | major)
 npm publish               # runs prepublishOnly (tsc); ships dist/ only
 ```
 
-If the name `ccmap` is taken on npm, publish scoped: set `"name": "@you/ccmap"`
-in `package.json`, update `PKG` in `src/cli.ts`, and `npm publish --access public`.
+Published as the scoped package **`@tao-hpu/ccmap`** (the bare `ccmap` name is
+blocked by npm for similarity to `cc-map`); the installed CLI command is still
+`ccmap`. Releases use a 2FA-bypassing automation token in `.env` via `pnpm release`.
 
 ## Badge server (Cloudflare Worker)
 
