@@ -4,6 +4,14 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.5] — 2026-06-23
+
+### Changed
+- The social/OG image (`/u/<user>.png`) is now a bespoke **tier-mascot card**: the
+  user's pixel-art rank sprite as the hero, rank title, headline stats, and
+  next-tier progress — far more shareable than the raw heatmap grid. The heatmap
+  badge is still available at `/u/<user>.png?card=badge`.
+
 ## [0.1.4] — 2026-06-23
 
 ### Added
@@ -81,6 +89,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.5]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.5
 [0.1.4]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.4
 [0.1.3]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.3
 [0.1.2]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.2

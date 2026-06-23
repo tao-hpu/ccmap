@@ -343,6 +343,49 @@ function rankCard(tokens: number, c: ReturnType<typeof resolveTheme>): string {
   </div>`;
 }
 
+// A bespoke 1200×630 social/OG card: the user's tier pixel-mascot as the hero,
+// rank title, and headline stats. Served (rasterized) at /u/<user>.png so X,
+// Slack, etc. unfurl a braggable image instead of a bare grid.
+export function renderSocialCard(d: ReportData, opts: ReportOptions = {}): string {
+  const c = resolveTheme(opts.theme);
+  const user = d.user || "you";
+  const { idx, tier, next } = rankFor(d.totals.tokens);
+  const W = 1200, H = 630;
+
+  // hero mascot, scaled big, on a rounded tile
+  const palette: Record<string, string> = { X: c.scale[3], o: c.scale[1], "#": c.sub };
+  const tile = { x: 80, y: 135, s: 360 };
+  const px = 40, sprite = 8 * px, ox = tile.x + (tile.s - sprite) / 2, oy = tile.y + (tile.s - sprite) / 2;
+  let rects = "";
+  for (let y = 0; y < tier.sprite.length; y++)
+    for (let x = 0; x < tier.sprite[y].length; x++) {
+      const fill = palette[tier.sprite[y][x]];
+      if (fill) rects += `<rect x="${ox + x * px}" y="${oy + y * px}" width="${px}" height="${px}" fill="${fill}"/>`;
+    }
+
+  const tx = 490; // right column
+  const titleSize = tier.title.length > 14 ? 58 : tier.title.length > 11 ? 72 : 92;
+  const cost = `$${Math.round(d.totals.cost).toLocaleString()}`;
+  const stats2 = `${cost} · ${d.totals.streak}-day streak · ${d.days.length} active days`;
+  const progress = next
+    ? `${fmt(next.min - d.totals.tokens)} tokens to ${esc(next.title)}`
+    : `top tier — ascended`;
+  const font = "-apple-system,Segoe UI,Helvetica,Arial,sans-serif";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${font}">
+  <rect width="${W}" height="${H}" fill="${c.bg}"/>
+  <rect x="6" y="6" width="${W - 12}" height="${H - 12}" rx="30" fill="none" stroke="${c.border}" stroke-width="2"/>
+  <rect x="${tile.x}" y="${tile.y}" width="${tile.s}" height="${tile.s}" rx="28" fill="${c.empty}"/>
+  <g shape-rendering="crispEdges">${rects}</g>
+  <text x="${tx}" y="190" font-size="28" font-weight="700" fill="${c.scale[2]}">cc<tspan fill="${c.sub}">▪</tspan>map<tspan fill="${c.sub}" font-weight="400">  ·  RANK ${idx + 1} / ${TIERS.length}</tspan></text>
+  <text x="${tx}" y="${190 + titleSize + 8}" font-size="${titleSize}" font-weight="700" fill="${c.text}">${esc(tier.title)}</text>
+  <text x="${tx}" y="${190 + titleSize + 58}" font-size="32" fill="${c.sub}">@${esc(user)} · Claude + Codex heatmap</text>
+  <text x="${tx}" y="475" font-size="46" font-weight="700" fill="${c.scale[2]}">${fmt(d.totals.tokens)} tokens</text>
+  <text x="${tx}" y="520" font-size="30" fill="${c.sub}">${stats2}</text>
+  <text x="${tx}" y="575" font-size="24" fill="${c.sub}">${progress}  ·  ccmap.fim.ai/u/${esc(user)}</text>
+</svg>`;
+}
+
 function bars(items: [string, number][], total: number, c: ReturnType<typeof resolveTheme>): string {
   const top = Math.max(1, ...items.map((it) => it[1]));
   return items
