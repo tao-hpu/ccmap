@@ -286,27 +286,33 @@ async function ensureOnboarded(cfg: Config): Promise<Config | null> {
   return cfg;
 }
 
+function postAggregates(base: string, token: string | undefined, payload: unknown) {
+  return fetch(base + "/api/push", {
+    method: "POST",
+    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(payload),
+  });
+}
+
 async function cmdPush(cfgIn: Config) {
   const cfg = await ensureOnboarded(cfgIn);
   if (!cfg) process.exit(1);
   const res = scan({ pricing: cfg.pricing });
   const payload = buildPayload(res, cfg);
   const base = (cfg.endpoint ?? "").replace(/\/$/, "");
-  const url = base + "/api/push";
   try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(cfg.token ? { authorization: `Bearer ${cfg.token}` } : {}),
-      },
-      body: JSON.stringify(payload),
-    });
+    let r = await postAggregates(base, cfg.token, payload);
+    // self-heal: if the server lost our claim (e.g. KV reset), re-claim with our
+    // stored key and retry once.
+    if (r.status === 403 && cfg.user && cfg.token) {
+      const c = await claimName(base, cfg.user, cfg.token);
+      if (c.ok) r = await postAggregates(base, cfg.token, payload);
+    }
     if (!r.ok) {
       console.error(`push failed: ${r.status} ${await r.text()}`);
       return false;
     }
-    console.log(`pushed ${payload.days.length} days · ${res.totalTokens.toLocaleString()} tok → ${url}`);
+    console.log(`pushed ${payload.days.length} days · ${res.totalTokens.toLocaleString()} tok → ${base}/api/push`);
     console.log(`badge:  ${base}/u/${cfg.user}.svg`);
     console.log(`report: ${base}/u/${cfg.user}`);
     return true;
