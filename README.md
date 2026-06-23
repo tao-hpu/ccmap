@@ -1,9 +1,8 @@
 # ccmap
 
-Coding heatmap for **Claude Code + Codex**. Scans your local CLI logs, renders a
-GitHub-style contribution heatmap, and can run resident to push aggregates to a
-badge endpoint — so you get a public `https://.../u/<you>.svg` you can embed in a
-README or post.
+Coding heatmap for **Claude Code + Codex**. Scans your local CLI logs and renders a
+GitHub-style contribution heatmap — in your terminal, as a local SVG/HTML report, or
+published to a public **report page** (`https://.../u/<you>`) with an embeddable badge.
 
 > **Privacy:** only per-day token/cost counts and model names ever leave your
 > machine. Never your prompts, code, or project names.
@@ -126,7 +125,7 @@ Grab the badge SVG from there, or embed it directly (GitHub renders SVG natively
 
 | param | values | default |
 | --- | --- | --- |
-| `theme` | `github-dark` `github-light` `tokyo-night` `dracula` `nord` (`dark`/`light` aliases) | `github-dark` |
+| `theme` | `claude` `github-dark` `github-light` `tokyo-night` `dracula` `nord` (`dark`/`light` aliases) | `claude` |
 | `metric` | `tokens` `cost` | `tokens` |
 | `weeks` | `1..53` | `26` |
 | `border` | `true` `false` | `false` |
@@ -162,8 +161,8 @@ interchangeable backends, same API:
 - **Cloudflare Worker** — `server/`, KV-backed: `wrangler deploy`.
 
 Optional write gate: set `PUSH_SECRET`; clients pass `ccmap login --invite <code>`.
-Auth is keyless on the server side — first push mints a local secret, the server
-stores only its `sha256` (back up `~/.ccmap/config.json`).
+No accounts: your first push mints a local secret and the server stores only its
+`sha256`, never the key itself — so back up `~/.ccmap/config.json`.
 
 ## Status
 
