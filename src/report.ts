@@ -387,13 +387,29 @@ export function renderReport(d: ReportData, opts: ReportOptions = {}): string {
   const stat = (label: string, value: string, icon: string) =>
     `<div class="stat"><div class="ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICONS[icon] ?? ""}</svg></div><div class="num">${value}</div><div class="cap">${label}</div></div>`;
 
+  const pageUrl = opts.origin ? `${opts.origin}/u/${user}` : "";
+  // Social cards need a RASTER image — X/Twitter won't render SVG. Point at the
+  // PNG route (the server rasterizes the badge); fall back to nothing locally.
+  const ogImg = opts.origin ? `${opts.origin}/u/${user}.png` : "";
+  const ogTitle = `${esc(user)} — ${esc(tier.title)} · ccmap`;
+  const ogDesc = `${fmt(d.totals.tokens)} tokens · $${d.totals.cost.toFixed(0)} · ${d.totals.streak}-day streak · rank: ${esc(tier.title)}`;
+  const ogTags = !opts.origin
+    ? ""
+    : `<meta property="og:type" content="website">
+<meta property="og:url" content="${pageUrl}">
+<meta property="og:title" content="${ogTitle}">
+<meta property="og:description" content="${ogDesc}">
+<meta property="og:image" content="${ogImg}">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="539">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${ogTitle}">
+<meta name="twitter:description" content="${ogDesc}">
+<meta name="twitter:image" content="${ogImg}">`;
+
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(user)} · ccmap report</title>
-<meta property="og:title" content="${esc(user)} — ${esc(tier.title)} · ccmap">
-<meta property="og:description" content="${fmt(d.totals.tokens)} tokens · $${d.totals.cost.toFixed(0)} · ${d.totals.streak}-day streak · rank: ${esc(tier.title)}">
-${badge ? `<meta property="og:image" content="${badge}">` : ""}
-<meta name="twitter:card" content="summary_large_image">
+${ogTags}
 <style>
   :root{--bg:${c.bg};--fg:${c.text};--sub:${c.sub};--card:${c.empty};--accent:${c.scale[2]};--accent-rgb:${rgbOf(c.scale[2])};--line:${c.border}}
   *{box-sizing:border-box}

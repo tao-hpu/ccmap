@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { writeFileSync, readFileSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, unlinkSync, mkdirSync } from "node:fs";
 import { randomBytes } from "node:crypto";
-import { spawn } from "node:child_process";
-import { userInfo } from "node:os";
+import { spawn, spawnSync } from "node:child_process";
+import { userInfo, homedir } from "node:os";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -395,9 +395,126 @@ function humanInterval(min: number): string {
   return `${min} min`;
 }
 
-async function cmdStart(cfg: Config) {
+// ---- daemon: OS-level scheduling (launchd on macOS, cron elsewhere) ----
+// A once-a-day push doesn't warrant a resident process, so `ccmap start` registers
+// a scheduled job instead. It survives logout/reboot natively — no `save` needed.
+const SCHED_LABEL = "ai.ccmap.push";
+const CRON_BEGIN = "# >>> ccmap >>>";
+const CRON_END = "# <<< ccmap <<<";
+
+function daemonLog(): string {
+  return join(dirname(CONFIG_PATH), "daemon.log");
+}
+function plistPath(): string {
+  return join(homedir(), "Library", "LaunchAgents", `${SCHED_LABEL}.plist`);
+}
+function cliEntry(): string {
+  return fileURLToPath(import.meta.url);
+}
+// cron can't express arbitrary minute intervals > 1h cleanly; map sensibly.
+function cronExpr(min: number): string {
+  if (min < 60) return `*/${Math.max(1, min)} * * * *`;
+  if (min < 1440 && min % 60 === 0) return `0 */${min / 60} * * *`;
+  return `0 9 * * *`; // daily at 09:00
+}
+
+function readCrontab(): string {
+  const r = spawnSync("crontab", ["-l"], { encoding: "utf8" });
+  return r.status === 0 ? r.stdout : "";
+}
+function writeCrontab(content: string): void {
+  const r = spawnSync("crontab", ["-"], { input: content.trim() === "" ? "\n" : content });
+  if (r.status !== 0) throw new Error("crontab write failed");
+}
+function stripCcmapBlock(s: string): string {
+  const re = new RegExp(`${CRON_BEGIN}[\\s\\S]*?${CRON_END}\\n?`, "g");
+  return s.replace(re, "").replace(/\n{3,}/g, "\n\n");
+}
+
+function installSchedule(cfg: Config): string {
+  const node = process.execPath;
+  const cli = cliEntry();
+  const log = daemonLog();
   const min = cfg.intervalMin ?? 1440;
-  console.log(`ccmap daemon — pushing every ${humanInterval(min)}. Ctrl-C to stop.`);
+  try { mkdirSync(dirname(log), { recursive: true }); } catch {}
+
+  if (process.platform === "darwin") {
+    const p = plistPath();
+    try { mkdirSync(dirname(p), { recursive: true }); } catch {}
+    const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>${SCHED_LABEL}</string>
+  <key>ProgramArguments</key><array><string>${node}</string><string>${cli}</string><string>push</string></array>
+  <key>StartInterval</key><integer>${min * 60}</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>${log}</string>
+  <key>StandardErrorPath</key><string>${log}</string>
+</dict></plist>
+`;
+    writeFileSync(p, plist);
+    spawnSync("launchctl", ["unload", p], { stdio: "ignore" });
+    const r = spawnSync("launchctl", ["load", p], { stdio: "ignore" });
+    if (r.status !== 0) throw new Error("launchctl load failed");
+    return "launchd";
+  }
+
+  // Linux / other: cron (@reboot for boot + recurring schedule)
+  const block = [
+    CRON_BEGIN,
+    `@reboot ${node} ${cli} push >> ${log} 2>&1`,
+    `${cronExpr(min)} ${node} ${cli} push >> ${log} 2>&1`,
+    CRON_END,
+  ].join("\n");
+  const cleaned = stripCcmapBlock(readCrontab()).replace(/\s*$/, "");
+  writeCrontab(`${cleaned ? cleaned + "\n\n" : ""}${block}\n`);
+  return "cron";
+}
+
+function removeSchedule(): boolean {
+  if (process.platform === "darwin") {
+    const p = plistPath();
+    if (!existsSync(p)) return false;
+    spawnSync("launchctl", ["unload", p], { stdio: "ignore" });
+    try { unlinkSync(p); } catch {}
+    return true;
+  }
+  const cur = readCrontab();
+  if (!cur.includes(CRON_BEGIN)) return false;
+  writeCrontab(stripCcmapBlock(cur));
+  return true;
+}
+function scheduleActive(): boolean {
+  return process.platform === "darwin" ? existsSync(plistPath()) : readCrontab().includes(CRON_BEGIN);
+}
+
+async function cmdStart(cfg: Config, args: string[]) {
+  if (args.includes("--foreground") || args.includes("-f")) return cmdStartForeground(cfg);
+  // push once now for instant feedback (also validates onboarding/config)
+  process.stdout.write("first push… ");
+  const ok = await cmdPush(cfg, false);
+  if (!ok) {
+    console.error("\nnot scheduling until a push succeeds — fix the error above and re-run `ccmap start`.");
+    process.exit(1);
+  }
+  let how: string;
+  try {
+    how = installSchedule(cfg);
+  } catch (e) {
+    console.error(`\ncould not register the scheduler (${(e as Error).message}).`);
+    console.error("run it attached instead:  ccmap start --foreground");
+    process.exit(1);
+  }
+  const min = cfg.intervalMin ?? 1440;
+  console.log(`\n✓ scheduled via ${how} — pushes every ${humanInterval(min)}, survives logout/reboot.`);
+  console.log(`  no terminal needed. logs: ${daemonLog()}`);
+  console.log(`  stop: ccmap stop   ·   status: ccmap status`);
+}
+
+// The old attached loop, kept for containers / debugging via `ccmap start --foreground`.
+async function cmdStartForeground(cfg: Config) {
+  const min = cfg.intervalMin ?? 1440;
+  console.log(`ccmap daemon (foreground) — pushing every ${humanInterval(min)}. Ctrl-C to stop.`);
   let first = true;
   const tick = async () => {
     const ts = new Date().toLocaleTimeString();
@@ -407,9 +524,26 @@ async function cmdStart(cfg: Config) {
   };
   await tick();
   setInterval(tick, min * 60 * 1000);
-  // check for a new version once now and then daily
   await checkUpdateNotice(cfg);
   setInterval(() => void checkUpdateNotice(cfg), 24 * 60 * 60 * 1000);
+}
+
+function cmdStop() {
+  if (removeSchedule()) console.log("✓ stopped — ccmap will no longer push on a schedule.");
+  else console.log("nothing to stop (no ccmap schedule was installed).");
+}
+
+function cmdStatus(cfg: Config) {
+  const active = scheduleActive();
+  const min = cfg.intervalMin ?? 1440;
+  console.log(`schedule: ${active ? `active (${process.platform === "darwin" ? "launchd" : "cron"}, every ${humanInterval(min)})` : "not running"}`);
+  if (active) console.log(`  ${process.platform === "darwin" ? plistPath() : "crontab block"}`);
+  console.log(`user:     ${cfg.user ?? "(unset)"}`);
+  console.log(`endpoint: ${cfg.endpoint ?? DEFAULT_ENDPOINT}`);
+  if (existsSync(daemonLog())) {
+    const lines = readFileSync(daemonLog(), "utf8").trim().split("\n");
+    if (lines[0]) console.log(`last log: ${lines[lines.length - 1]}`);
+  }
 }
 
 function cmdConfig(args: string[]) {
@@ -461,9 +595,12 @@ Usage:
                                    Claim a specific username (optional — push auto-claims).
   ccmap push [--user <name>]       Push aggregates. First run picks a username
                                    (prompts on a terminal; --user / CCMAP_USER to set it)
-  ccmap start                      Resident: push on an interval
+  ccmap start [--foreground]       Schedule pushes via launchd/cron (survives reboot,
+                                   no terminal needed). --foreground runs an attached loop.
+  ccmap stop                       Remove the scheduled job
+  ccmap status                     Show schedule + last push
   ccmap config [--interval <min>] [--metric tokens|cost] [--theme dark|light]
-                                   (--interval is minutes between 'ccmap start' pushes; default 1440 = daily)
+                                   (--interval is minutes between scheduled pushes; default 1440 = daily)
   ccmap update                     Self-update to the latest published version
   ccmap version
 
@@ -491,7 +628,13 @@ async function main() {
       await cmdPush(cfg, true, argVal(args, "--user"));
       break;
     case "start":
-      await cmdStart(cfg);
+      await cmdStart(cfg, args);
+      break;
+    case "stop":
+      cmdStop();
+      break;
+    case "status":
+      cmdStatus(cfg);
       break;
     case "config":
       cmdConfig(args);

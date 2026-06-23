@@ -4,6 +4,20 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.4] — 2026-06-23
+
+### Added
+- `ccmap start` now registers an **OS-level scheduled job** (launchd on macOS,
+  cron elsewhere) instead of holding a foreground loop — it survives logout/reboot
+  with no terminal attached, and needs no `save`. New `ccmap stop` / `ccmap status`;
+  `ccmap start --foreground` keeps the old attached loop for containers/debugging.
+- **Social cards.** Report pages emit full Open Graph + Twitter Card tags, and the
+  server gained a `/u/<user>.png` route (rasterized badge via resvg) so X/Twitter,
+  Slack, etc. render a real preview image instead of a bare link.
+
+### Fixed
+- Social tags now use the reverse proxy's `https` origin (was `http://`).
+
 ## [0.1.3] — 2026-06-23
 
 ### Fixed
@@ -67,6 +81,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.4]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.4
 [0.1.3]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.3
 [0.1.2]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.2
 [0.1.1]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.1

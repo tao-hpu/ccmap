@@ -14,8 +14,9 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import { renderSVG } from "./render.js";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { renderSVG, resolveTheme } from "./render.js";
 import { renderReport } from "./report.js";
 
 const PORT = Number(process.env.PORT || 3006);
@@ -187,7 +188,87 @@ function handleBadge(user: string, url: URL, res: ServerResponse): void {
   });
 }
 
-function handleReport(user: string, url: URL, res: ServerResponse): void {
+// resvg-wasm ships no fonts, so SVG text renders blank unless we feed it font
+// buffers. Read TTFs once (DejaVu by default; override with CCMAP_FONTS).
+let FONTS: Uint8Array[] | null = null;
+function fontBuffers(): Uint8Array[] {
+  if (FONTS) return FONTS;
+  const paths = (
+    process.env.CCMAP_FONTS ||
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf,/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+  ).split(",");
+  const bufs: Uint8Array[] = [];
+  for (const p of paths) {
+    try {
+      bufs.push(new Uint8Array(readFileSync(p.trim())));
+    } catch {}
+  }
+  FONTS = bufs;
+  return bufs;
+}
+
+// Build the public origin, honoring the reverse proxy's X-Forwarded-Proto so
+// social tags get https:// (the backend itself only sees http).
+function originOf(req: IncomingMessage, url: URL): string {
+  const proto = ((req.headers["x-forwarded-proto"] as string) || "").split(",")[0].trim() || url.protocol.replace(":", "");
+  return `${proto}://${req.headers.host || url.host}`;
+}
+
+// Lazy-load @resvg/resvg-wasm (optional dep; only the server needs it). Cached.
+let resvgMod: Promise<any> | null = null;
+function getResvg(): Promise<any> {
+  if (!resvgMod) {
+    resvgMod = (async () => {
+      const spec = "@resvg/resvg-wasm"; // non-literal: keeps it out of tsc's module resolution
+      const mod: any = await import(spec);
+      const wasm = join(dirname(fileURLToPath(import.meta.url)), "..", "node_modules", "@resvg", "resvg-wasm", "index_bg.wasm");
+      await mod.initWasm(readFileSync(wasm));
+      return mod;
+    })();
+  }
+  return resvgMod;
+}
+
+// PNG badge — social cards (X/Twitter, etc.) can't render SVG, so rasterize it.
+async function handlePng(user: string, url: URL, res: ServerResponse): Promise<void> {
+  if (!USER_RE.test(user)) return send(res, 400, "bad user");
+  const raw = kvGet(`user:${user}`);
+  if (!raw) return send(res, 404, "not found");
+  const p = JSON.parse(raw) as PushPayload;
+  const metric = (url.searchParams.get("metric") as "tokens" | "cost") || "tokens";
+  const theme = url.searchParams.get("theme") || "claude";
+  const weeks = Number(url.searchParams.get("weeks") || 26);
+  const svg = renderSVG(
+    daysToMap(p),
+    { totalTokens: p.totals.tokens, totalCost: p.totals.cost, streak: p.totals.streak },
+    { metric, theme, weeks, border: true, title: `${user} · coding heatmap` }
+  );
+  // The badge uses an emoji (🔥) for flair, which renders in browsers/GitHub but
+  // shows as tofu in resvg (no emoji font). Strip emoji only for the raster path.
+  const pngSvg = svg.replace(/\p{Extended_Pictographic}️?\s?/gu, "");
+  try {
+    const { Resvg } = await getResvg();
+    const png = new Resvg(pngSvg, {
+      fitTo: { mode: "width", value: 1200 },
+      background: resolveTheme(theme).bg,
+      font: { fontBuffers: fontBuffers(), defaultFontFamily: "DejaVu Sans", loadSystemFonts: false },
+    })
+      .render()
+      .asPng();
+    res.writeHead(200, {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=300",
+      "access-control-allow-origin": "*",
+    });
+    res.end(png);
+  } catch {
+    // resvg unavailable → degrade to the SVG so the route never hard-fails
+    res.writeHead(302, { location: `/u/${encodeURIComponent(user)}.svg` });
+    res.end();
+  }
+}
+
+function handleReport(req: IncomingMessage, user: string, url: URL, res: ServerResponse): void {
   if (!USER_RE.test(user)) return send(res, 400, "bad user");
   const raw = kvGet(`user:${user}`);
   if (!raw) return send(res, 404, "not found");
@@ -195,7 +276,7 @@ function handleReport(user: string, url: URL, res: ServerResponse): void {
   const theme = url.searchParams.get("theme") || "claude";
   const html = renderReport(
     { user, totals: p.totals, byModel: p.byModel, days: p.days },
-    { theme, origin: url.origin, share: true }
+    { theme, origin: originOf(req, url), share: true }
   );
   send(res, 200, html, { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300" });
 }
@@ -209,11 +290,14 @@ const server = createServer(async (req, res) => {
     if (method === "POST" && path === "/api/claim") return await handleClaim(req, res);
     if (method === "POST" && path === "/api/push") return await handlePush(req, res);
 
+    const pngM = path.match(/^\/u\/([^/]+)\.png$/);
+    if (method === "GET" && pngM) return await handlePng(decodeURIComponent(pngM[1]), url, res);
+
     const m = path.match(/^\/u\/([^/]+)\.svg$/);
     if (method === "GET" && m) return handleBadge(decodeURIComponent(m[1]), url, res);
 
     const h = path.match(/^\/u\/([^/]+?)(?:\.html)?$/);
-    if (method === "GET" && h) return handleReport(decodeURIComponent(h[1]), url, res);
+    if (method === "GET" && h) return handleReport(req, decodeURIComponent(h[1]), url, res);
 
     if (path === "/health") return send(res, 200, "ok");
     if (path === "/") {
