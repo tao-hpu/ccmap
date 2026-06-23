@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "test": "tsx --test tests/*.test.ts",
     "dev": "tsx src/cli.ts",
     "start": "node dist/cli.js",
     "prepublishOnly": "tsc",

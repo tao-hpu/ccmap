@@ -4,6 +4,21 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.11] — 2026-06-23
+
+### Fixed
+- **The share card never refreshed on X.** `og:image`/`twitter:image` pointed at a
+  version-less `/u/<user>.png`, so X (and Slack, etc.) kept serving a long-cached
+  old PNG even after the card design changed — which is why the heatmap appeared
+  missing. The og:image now inherits the page's cache-bust tag and selected theme
+  (`/u/<user>.png?theme=…&v=…`), so every fresh "Post on X" fetches a fresh card.
+  A `CARD_REV` bump also drops stale caches for plain (un-busted) shares.
+
+### Changed
+- **Heatmap empty cells are lifted above the background** on the social/portrait
+  cards, so a sparse year still reads as a recognizable grid at thumbnail size
+  instead of disappearing into the dark card.
+
 ## [0.1.10] — 2026-06-23
 
 ### Fixed
@@ -159,6 +174,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.11]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.11
 [0.1.10]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.10
 [0.1.9]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.9
 [0.1.8]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.8

@@ -284,7 +284,7 @@ function handleReport(req: IncomingMessage, user: string, url: URL, res: ServerR
   const theme = url.searchParams.get("theme") || "claude";
   const html = renderReport(
     { user, totals: p.totals, byModel: p.byModel, days: p.days },
-    { theme, origin: originOf(req, url), share: true }
+    { theme, origin: originOf(req, url), share: true, cacheBust: url.searchParams.get("v") || undefined }
   );
   send(res, 200, html, { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300" });
 }

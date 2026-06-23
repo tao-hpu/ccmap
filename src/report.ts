@@ -34,6 +34,19 @@ export interface ReportOptions {
   origin?: string; // public base URL, for OG tags / badge embed
   share?: boolean; // include the "Customize & share" embed section (hosted report only)
   weeks?: number; // heatmap span for the portrait card (26 or 53; default 26)
+  cacheBust?: string; // appended to og:image so X/Slack refetch a fresh card
+}
+
+// Bump when the OG card design changes so platforms drop their cached image even
+// for shares that don't carry a per-request cache-bust tag.
+const CARD_REV = "2";
+
+// Blend two #rrggbb colors (t=0→a, 1→b). Used to lift "empty" heatmap cells just
+// above the background so the grid stays legible at thumbnail size.
+function mix(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = (sh: number) => Math.round((((pa >> sh) & 255) * (1 - t)) + (((pb >> sh) & 255) * t));
+  return `#${((1 << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).slice(1)}`;
 }
 
 function fmt(n: number): string {
@@ -423,6 +436,7 @@ export function renderSocialCard(d: ReportData, opts: ReportOptions = {}): strin
   const q = (p: number) => (vals.length ? vals[Math.min(vals.length - 1, Math.floor(p * vals.length))] : 0);
   const t1 = q(0.25), t2 = q(0.5), t3 = q(0.75);
   const lvl = (v: number) => (v <= 0 ? -1 : v <= t1 ? 0 : v <= t2 ? 1 : v <= t3 ? 2 : 3);
+  const emptyFill = mix(c.bg, c.sub, 0.2); // lift empties above bg so the grid reads
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const start = new Date(today); start.setDate(start.getDate() - (weeks - 1) * 7 - today.getDay());
   let grid = "";
@@ -432,7 +446,7 @@ export function renderSocialCard(d: ReportData, opts: ReportOptions = {}): strin
       if (cur <= today) {
         const v = byDate.get(dKey(cur)) || 0;
         const l = lvl(v);
-        grid += `<rect x="${gx + col * gstep}" y="${gy + row * gstep}" width="${gcell}" height="${gcell}" rx="3" fill="${l < 0 ? c.empty : c.scale[l]}"/>`;
+        grid += `<rect x="${gx + col * gstep}" y="${gy + row * gstep}" width="${gcell}" height="${gcell}" rx="3" fill="${l < 0 ? emptyFill : c.scale[l]}"/>`;
       }
       cur.setDate(cur.getDate() + 1);
     }
@@ -491,6 +505,7 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
   const q = (p: number) => (vals.length ? vals[Math.min(vals.length - 1, Math.floor(p * vals.length))] : 0);
   const t1 = q(0.25), t2 = q(0.5), t3 = q(0.75);
   const lvl = (v: number) => (v <= 0 ? -1 : v <= t1 ? 0 : v <= t2 ? 1 : v <= t3 ? 2 : 3);
+  const emptyFill = mix(c.bg, c.sub, 0.2); // lift empties above bg so the grid reads
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const start = new Date(today); start.setDate(start.getDate() - (weeks - 1) * 7 - today.getDay());
   let grid = "";
@@ -499,7 +514,7 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
     for (let row = 0; row < 7; row++) {
       if (cur <= today) {
         const v = byDate.get(dKey(cur)) || 0, l = lvl(v);
-        grid += `<rect x="${gx + col * gstep}" y="${gy + row * gstep}" width="${gcell}" height="${gcell}" rx="3" fill="${l < 0 ? c.empty : c.scale[l]}"/>`;
+        grid += `<rect x="${gx + col * gstep}" y="${gy + row * gstep}" width="${gcell}" height="${gcell}" rx="3" fill="${l < 0 ? emptyFill : c.scale[l]}"/>`;
       }
       cur.setDate(cur.getDate() + 1);
     }
@@ -582,7 +597,13 @@ export function renderReport(d: ReportData, opts: ReportOptions = {}): string {
   const pageUrl = opts.origin ? `${opts.origin}/u/${user}` : "";
   // Social cards need a RASTER image — X/Twitter won't render SVG. Point at the
   // PNG route (the server rasterizes the badge); fall back to nothing locally.
-  const ogImg = opts.origin ? `${opts.origin}/u/${user}.png` : "";
+  // og:image carries the theme (so a themed share previews correctly) and a
+  // cache-bust tag — X/Slack cache the image URL forever otherwise, so a stale
+  // card (or one cropped under an old declared size) never refreshes.
+  const ogQ: string[] = [];
+  if (opts.theme && opts.theme !== "claude") ogQ.push(`theme=${encodeURIComponent(opts.theme)}`);
+  ogQ.push(`v=${encodeURIComponent(opts.cacheBust || CARD_REV)}`);
+  const ogImg = opts.origin ? `${opts.origin}/u/${user}.png?${ogQ.join("&")}` : "";
   const ogTitle = `${emo} ${esc(user)} — ${esc(tier.title)} on ccmap`;
   const ogDesc = `🔥 ${fmt(d.totals.tokens)} tokens · 💰 $${Math.round(d.totals.cost).toLocaleString()} · 🗓️ ${d.totals.streak}-day streak across Claude + Codex 🤖  👀 See your own coding heatmap → npm i -g @tao-hpu/ccmap`;
   const ogTags = !opts.origin

@@ -46,6 +46,24 @@ Don't want to install? `npx @tao-hpu/ccmap@latest scan` runs it once, always lat
 - Claude Code: `~/.claude/projects/**/*.jsonl` (assistant `message.usage`)
 - Codex: `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (`token_count` events)
 
+## Local history (so your heatmap keeps filling up)
+
+Claude Code prunes its own session logs after ~30 days (`cleanupPeriodDays`,
+default 30), and Codex has its own retention — so the raw logs are a **rolling
+window**, not your full past. If a fresh heatmap looks sparse, that's why: the
+older transcripts are already gone from disk.
+
+To stop losing history going forward, every `scan` / `render` / `report` /
+`push` snapshots each day's totals into a tiny rollup at **`~/.ccmap/history.json`**
+(a few KB/year). Once a day is recorded it stays on the heatmap **even after
+Claude Code deletes the raw transcript** — so the map keeps lighting up over time.
+This is fully automatic and local: it touches **no** Claude Code / Codex config,
+and nothing extra leaves your machine.
+
+> Run regularly (e.g. `ccmap start`, which pushes daily) so each day is captured
+> before the 30-day prune removes it. Already-deleted history can't be recovered —
+> it accumulates from when you start running ccmap.
+
 ## Pricing
 
 Cost is an **estimate** from a built-in per-model price table. Override any model

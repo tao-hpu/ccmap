@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { costOf, type Price } from "./pricing.js";
+import { loadRollup, saveRollup, mergeDays, dayStatToRecord, type DayRecord } from "./rollup.js";
 
 export type Source = "claude" | "codex";
 
@@ -91,6 +92,27 @@ export interface ScanOptions {
   claudeDir?: string;
   codexDir?: string;
   pricing?: Record<string, Price>;
+  // Path to the persistent daily rollup. When set, scan merges the live log
+  // scan with previously-seen days (so pruned history survives) and writes the
+  // merged result back. Omit it (e.g. in tests) for a pure, side-effect-free scan.
+  rollupPath?: string;
+}
+
+// Roll a day map up into the report-level totals.
+function summarize(days: Map<string, DayStat>) {
+  let totalTokens = 0;
+  let totalCost = 0;
+  const byModel: Record<string, number> = {};
+  const bySource: Record<Source, number> = { claude: 0, codex: 0 };
+  const dates = [...days.keys()].sort();
+  for (const d of days.values()) {
+    totalTokens += d.tokens;
+    totalCost += d.cost;
+    bySource.claude += d.bySource.claude;
+    bySource.codex += d.bySource.codex;
+    for (const [m, v] of Object.entries(d.byModel)) byModel[m] = (byModel[m] || 0) + v;
+  }
+  return { totalTokens, totalCost, byModel, bySource, firstDay: dates[0], lastDay: dates[dates.length - 1] };
 }
 
 export function scan(opts: ScanOptions = {}): ScanResult {
@@ -185,29 +207,16 @@ export function scan(opts: ScanOptions = {}): ScanResult {
     }
   }
 
-  // --- totals ---
-  let totalTokens = 0;
-  let totalCost = 0;
-  const byModel: Record<string, number> = {};
-  const bySource: Record<Source, number> = { claude: 0, codex: 0 };
-  const dates = [...days.keys()].sort();
-  for (const d of days.values()) {
-    totalTokens += d.tokens;
-    totalCost += d.cost;
-    bySource.claude += d.bySource.claude;
-    bySource.codex += d.bySource.codex;
-    for (const [m, v] of Object.entries(d.byModel)) byModel[m] = (byModel[m] || 0) + v;
+  // --- merge with the persistent rollup so pruned days survive ---
+  let result = days;
+  if (opts.rollupPath) {
+    result = mergeDays(days, loadRollup(opts.rollupPath));
+    const rec = new Map<string, DayRecord>();
+    for (const [date, d] of result) rec.set(date, dayStatToRecord(d));
+    saveRollup(rec, opts.rollupPath);
   }
 
-  return {
-    days,
-    totalTokens,
-    totalCost,
-    byModel,
-    bySource,
-    firstDay: dates[0],
-    lastDay: dates[dates.length - 1],
-  };
+  return { days: result, ...summarize(result) };
 }
 
 // Longest run of consecutive active days ending at `today`.

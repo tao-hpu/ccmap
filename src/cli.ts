@@ -11,6 +11,7 @@ import { renderSVG, resolveTheme } from "./render.js";
 import { renderReport } from "./report.js";
 import type { DayStat } from "./parse.js";
 import { loadConfig, saveConfig, CONFIG_PATH, type Config } from "./config.js";
+import { ROLLUP_PATH } from "./rollup.js";
 
 // Read from package.json at runtime so the version never drifts from npm.
 // dist/cli.js lives one level under the package root, next to package.json.
@@ -208,7 +209,7 @@ function sparkline(days: Map<string, DayStat>, n = 30): string {
 }
 
 function cmdScan(cfg: Config) {
-  const res = scan({ pricing: cfg.pricing });
+  const res = scan({ pricing: cfg.pricing, rollupPath: ROLLUP_PATH });
   const streak = currentStreak(res.days);
   console.log(`ccmap ${VERSION} — local scan`);
   console.log(`  range:    ${res.firstDay ?? "-"} → ${res.lastDay ?? "-"}  (${res.days.size} active days)`);
@@ -229,6 +230,29 @@ function cmdScan(cfg: Config) {
       console.log("  " + line);
     }
   }
+
+  retentionNote(res, cfg);
+}
+
+// One-time, self-expiring explainer for "why isn't my heatmap lit up?". Claude
+// Code prunes session logs after ~30 days, so a fresh install can't show more
+// history than survives on disk. We print this only until the cached history
+// (rollup) has deepened past the card window — after which it's irrelevant and
+// disappears on its own.
+function retentionNote(res: ScanResult, cfg: Config) {
+  if (!res.firstDay) return;
+  const windowDays = (cfg.weeks ?? 26) * 7;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const first = new Date(`${res.firstDay}T00:00:00`);
+  const spanDays = Math.floor((today.getTime() - first.getTime()) / 86_400_000) + 1;
+  if (spanDays >= windowDays) return;
+  console.log(
+    `\n  ℹ history spans ${spanDays}d (< ${windowDays}d heatmap window). Claude Code prunes\n` +
+      `    session logs after ~30 days, so older activity is already gone. ccmap now\n` +
+      `    caches daily usage to ${ROLLUP_PATH} and keeps\n` +
+      `    accumulating from here — the heatmap fills in over time.`
+  );
 }
 
 function cmdRender(cfg: Config, args: string[]) {
@@ -241,7 +265,7 @@ function cmdRender(cfg: Config, args: string[]) {
   // --hide-border kept as a no-op alias since border is now off by default)
   const border = args.includes("--border");
   const rounded = args.includes("--rounded");
-  const res = scan({ pricing: cfg.pricing });
+  const res = scan({ pricing: cfg.pricing, rollupPath: ROLLUP_PATH });
   const svg = renderSVG(
     res.days,
     { totalTokens: res.totalTokens, totalCost: res.totalCost, streak: currentStreak(res.days) },
@@ -254,7 +278,7 @@ function cmdRender(cfg: Config, args: string[]) {
 function cmdReport(cfg: Config, args: string[]) {
   const out = argVal(args, "--out") ?? "ccmap-report.html";
   const theme = argVal(args, "--theme") ?? cfg.theme ?? "claude";
-  const res = scan({ pricing: cfg.pricing });
+  const res = scan({ pricing: cfg.pricing, rollupPath: ROLLUP_PATH });
   const payload = buildPayload(res, cfg);
   const html = renderReport({ user: cfg.user, totals: payload.totals, byModel: payload.byModel, days: payload.days }, { theme, origin: cfg.endpoint });
   writeFileSync(out, html);
@@ -352,7 +376,7 @@ async function cmdPush(cfgIn: Config, hint = false, explicitUser?: string) {
   if (explicitUser && cleanName(explicitUser) !== cfg.user) {
     console.log(`note: already configured as "${cfg.user}". To switch names: ccmap login --user ${cleanName(explicitUser)}`);
   }
-  const res = scan({ pricing: cfg.pricing });
+  const res = scan({ pricing: cfg.pricing, rollupPath: ROLLUP_PATH });
   const payload = buildPayload(res, cfg);
   const base = (cfg.endpoint ?? "").replace(/\/$/, "");
   try {
