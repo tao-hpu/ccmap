@@ -535,7 +535,9 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
   <rect width="${W}" height="${H}" fill="${c.bg}"/>
   <rect x="6" y="6" width="${W - 12}" height="${H - 12}" fill="none" stroke="${c.border}" stroke-width="2"/>
   <rect x="${cx - 74}" y="62" width="148" height="50" rx="9" fill="${c.bg}" stroke="${c.border}" stroke-width="1.5"/>
-  <text x="${cx}" y="97" text-anchor="middle" font-size="30" font-weight="800" fill="${c.text}" letter-spacing="-0.5">cc<tspan fill="${c.scale[2]}">▪</tspan>map</text>
+  <text x="${cx - 21}" y="97" text-anchor="end" font-size="30" font-weight="800" fill="${c.text}">cc</text>
+  <rect x="${cx - 17}" y="83" width="11" height="11" fill="${c.scale[2]}"/>
+  <text x="${cx - 2}" y="97" text-anchor="start" font-size="30" font-weight="800" fill="${c.text}">map</text>
   <rect x="${tx0}" y="${tile.y}" width="${tile.s}" height="${tile.s}" fill="${c.empty}"/>
   <g shape-rendering="crispEdges">${mascot}</g>
   <text x="${cx}" y="438" text-anchor="middle" font-size="23" font-weight="600" fill="${c.sub}" letter-spacing="2">RANK ${idx + 1} / ${TIERS.length} · BY TOTAL TOKENS</text>

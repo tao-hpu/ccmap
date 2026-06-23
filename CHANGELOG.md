@@ -4,6 +4,14 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.13] — 2026-06-23
+
+### Fixed
+- **Portrait card logo lost its accent dot.** The `▪` in `cc▪map` is treated as
+  emoji and stripped on the PNG raster path, so the downloaded card showed a flat
+  white "ccmap". The dot is now drawn as a real accent-colored square, matching
+  the HTML header's `cc▪map` exactly.
+
 ## [0.1.12] — 2026-06-23
 
 ### Changed
@@ -183,6 +191,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.13]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.13
 [0.1.12]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.12
 [0.1.11]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.11
 [0.1.10]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.10
