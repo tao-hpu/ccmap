@@ -332,6 +332,15 @@ function rankCard(tokens: number, c: ReturnType<typeof resolveTheme>): string {
        <div class="rk-scale"><span>${fmt(tier.min)}</span><span>${prog.toFixed(0)}% through this tier</span><span>${fmt(next.min)}</span></div>
        <div class="rk-next"><b>${fmt(next.min - tokens)}</b> more tokens → <b>${esc(next.title)}</b> (unlocks at ${fmt(next.min)})</div>`
     : `<div class="rk-next">top tier — you've hit ${fmt(tier.min)}+ tokens and ascended 🛸</div>`;
+  const ladder = `<div class="rk-ladder">${TIERS.map((t, i) => {
+    const cls = i === idx ? "cur" : i < idx ? "done" : "";
+    const tip = i < idx ? "unlocked" : i === idx ? "you are here" : `${fmt(t.min - tokens)} tokens to go`;
+    return `<div class="rk-step ${cls}" data-tip="Tier ${i + 1}: ${esc(t.title)} · unlocks at ${fmt(t.min)} tokens · ${tip}">
+      <div class="px">${pixelSprite(t.sprite, c, 4)}</div>
+      <div class="nm">${esc(t.title)}</div>
+      <div class="th">${i === 0 ? "0" : fmt(t.min)}</div>
+    </div>`;
+  }).join("")}</div>`;
   return `<div class="rank">
     <div class="rk-icon">${sprite}</div>
     <div class="rk-body">
@@ -340,49 +349,75 @@ function rankCard(tokens: number, c: ReturnType<typeof resolveTheme>): string {
       <div class="rk-sub">${fmt(tokens)} tokens consumed across Claude + Codex</div>
       ${progLine}
     </div>
-  </div>`;
+  </div>${ladder}`;
 }
 
 // A bespoke 1200×630 social/OG card: the user's tier pixel-mascot as the hero,
 // rank title, and headline stats. Served (rasterized) at /u/<user>.png so X,
 // Slack, etc. unfurl a braggable image instead of a bare grid.
+function dKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function renderSocialCard(d: ReportData, opts: ReportOptions = {}): string {
   const c = resolveTheme(opts.theme);
   const user = d.user || "you";
   const { idx, tier, next } = rankFor(d.totals.tokens);
   const W = 1200, H = 630;
+  const font = "-apple-system,Segoe UI,Helvetica,Arial,sans-serif";
 
-  // hero mascot, scaled big, on a rounded tile
+  // hero mascot on a rounded tile (top-left)
   const palette: Record<string, string> = { X: c.scale[3], o: c.scale[1], "#": c.sub };
-  const tile = { x: 80, y: 135, s: 360 };
-  const px = 40, sprite = 8 * px, ox = tile.x + (tile.s - sprite) / 2, oy = tile.y + (tile.s - sprite) / 2;
-  let rects = "";
+  const tile = { x: 64, y: 56, s: 232 };
+  const px = 24, sprite = 8 * px, ox = tile.x + (tile.s - sprite) / 2, oy = tile.y + (tile.s - sprite) / 2;
+  let mascot = "";
   for (let y = 0; y < tier.sprite.length; y++)
     for (let x = 0; x < tier.sprite[y].length; x++) {
       const fill = palette[tier.sprite[y][x]];
-      if (fill) rects += `<rect x="${ox + x * px}" y="${oy + y * px}" width="${px}" height="${px}" fill="${fill}"/>`;
+      if (fill) mascot += `<rect x="${ox + x * px}" y="${oy + y * px}" width="${px}" height="${px}" fill="${fill}"/>`;
     }
 
-  const tx = 490; // right column
-  const titleSize = tier.title.length > 14 ? 58 : tier.title.length > 11 ? 72 : 92;
-  const cost = `$${Math.round(d.totals.cost).toLocaleString()}`;
-  const stats2 = `${cost} · ${d.totals.streak}-day streak · ${d.days.length} active days`;
-  const progress = next
-    ? `${fmt(next.min - d.totals.tokens)} tokens to ${esc(next.title)}`
-    : `top tier — ascended`;
-  const font = "-apple-system,Segoe UI,Helvetica,Arial,sans-serif";
+  // the actual heatmap — a full-year strip across the bottom (the "map")
+  const weeks = 53, gcell = 17, ggap = 3, gstep = gcell + ggap;
+  const gx = 64, gy = 388;
+  const byDate = new Map<string, number>(d.days.map((x) => [x.date, x.tokens]));
+  const vals = d.days.map((x) => x.tokens).filter((v) => v > 0).sort((a, b) => a - b);
+  const q = (p: number) => (vals.length ? vals[Math.min(vals.length - 1, Math.floor(p * vals.length))] : 0);
+  const t1 = q(0.25), t2 = q(0.5), t3 = q(0.75);
+  const lvl = (v: number) => (v <= 0 ? -1 : v <= t1 ? 0 : v <= t2 ? 1 : v <= t3 ? 2 : 3);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(today); start.setDate(start.getDate() - (weeks - 1) * 7 - today.getDay());
+  let grid = "";
+  const cur = new Date(start);
+  for (let col = 0; col < weeks; col++) {
+    for (let row = 0; row < 7; row++) {
+      if (cur <= today) {
+        const v = byDate.get(dKey(cur)) || 0;
+        const l = lvl(v);
+        grid += `<rect x="${gx + col * gstep}" y="${gy + row * gstep}" width="${gcell}" height="${gcell}" rx="3" fill="${l < 0 ? c.empty : c.scale[l]}"/>`;
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${font}">
+  const tx = 330; // right of mascot
+  const titleSize = tier.title.length > 14 ? 54 : tier.title.length > 11 ? 64 : 80;
+  const cost = `$${Math.round(d.totals.cost).toLocaleString()}`;
+  const sub = `${cost} · ${d.totals.streak}-day streak · ${d.days.length} active days`;
+  const goal = next ? `${fmt(next.min - d.totals.tokens)} tokens to ${esc(next.title)}` : "top tier — ascended";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${font}" xml:space="preserve">
   <rect width="${W}" height="${H}" fill="${c.bg}"/>
   <rect x="6" y="6" width="${W - 12}" height="${H - 12}" rx="30" fill="none" stroke="${c.border}" stroke-width="2"/>
-  <rect x="${tile.x}" y="${tile.y}" width="${tile.s}" height="${tile.s}" rx="28" fill="${c.empty}"/>
-  <g shape-rendering="crispEdges">${rects}</g>
-  <text x="${tx}" y="190" font-size="28" font-weight="700" fill="${c.scale[2]}">cc<tspan fill="${c.sub}">▪</tspan>map<tspan fill="${c.sub}" font-weight="400">  ·  RANK ${idx + 1} / ${TIERS.length}</tspan></text>
-  <text x="${tx}" y="${190 + titleSize + 8}" font-size="${titleSize}" font-weight="700" fill="${c.text}">${esc(tier.title)}</text>
-  <text x="${tx}" y="${190 + titleSize + 58}" font-size="32" fill="${c.sub}">@${esc(user)} · Claude + Codex heatmap</text>
-  <text x="${tx}" y="475" font-size="46" font-weight="700" fill="${c.scale[2]}">${fmt(d.totals.tokens)} tokens</text>
-  <text x="${tx}" y="520" font-size="30" fill="${c.sub}">${stats2}</text>
-  <text x="${tx}" y="575" font-size="24" fill="${c.sub}">${progress}  ·  ccmap.fim.ai/u/${esc(user)}</text>
+  <rect x="${tile.x}" y="${tile.y}" width="${tile.s}" height="${tile.s}" rx="24" fill="${c.empty}"/>
+  <g shape-rendering="crispEdges">${mascot}</g>
+  <text x="${tx}" y="104" font-size="26" font-weight="700" fill="${c.scale[2]}">cc<tspan fill="${c.sub}">▪</tspan>map<tspan fill="${c.sub}" font-weight="400">  ·  RANK ${idx + 1} / ${TIERS.length}</tspan></text>
+  <text x="${tx}" y="${104 + titleSize + 6}" font-size="${titleSize}" font-weight="700" fill="${c.text}">${esc(tier.title)}</text>
+  <text x="${tx}" y="${104 + titleSize + 52}" font-size="30" fill="${c.sub}">@${esc(user)} · Claude + Codex heatmap</text>
+  <text x="${tx}" y="328" font-size="44" font-weight="700" fill="${c.scale[2]}">${fmt(d.totals.tokens)} tokens<tspan font-size="26" font-weight="400" fill="${c.sub}">  · ${goal}</tspan></text>
+  <text x="${tx}" y="366" font-size="28" fill="${c.sub}">${sub}</text>
+  <g>${grid}</g>
+  <text x="${gx}" y="588" font-size="24" fill="${c.sub}">see your own → <tspan fill="${c.text}" font-weight="700">npm i -g @tao-hpu/ccmap</tspan>   ·   ccmap.fim.ai   ·   github.com/tao-hpu/ccmap</text>
 </svg>`;
 }
 
@@ -424,7 +459,9 @@ export function renderReport(d: ReportData, opts: ReportOptions = {}): string {
   const avgActive = activeDays ? d.totals.tokens / activeDays : 0;
   const words = Math.round(d.totals.tokens * 0.75);
   const novels = words / 100000;
-  const { tier } = rankFor(d.totals.tokens);
+  const { idx: tierIdx, tier } = rankFor(d.totals.tokens);
+  const TIER_EMOJI = ["🌱", "⚙️", "⚡", "🔥", "👑", "⭐"];
+  const emo = TIER_EMOJI[tierIdx] ?? "👾";
   const trendStr = trend === null ? "—" : (trend >= 0 ? "▲ " : "▼ ") + Math.abs(trend).toFixed(0) + "%";
 
   const stat = (label: string, value: string, icon: string) =>
@@ -434,8 +471,8 @@ export function renderReport(d: ReportData, opts: ReportOptions = {}): string {
   // Social cards need a RASTER image — X/Twitter won't render SVG. Point at the
   // PNG route (the server rasterizes the badge); fall back to nothing locally.
   const ogImg = opts.origin ? `${opts.origin}/u/${user}.png` : "";
-  const ogTitle = `${esc(user)} — ${esc(tier.title)} · ccmap`;
-  const ogDesc = `${fmt(d.totals.tokens)} tokens · $${d.totals.cost.toFixed(0)} · ${d.totals.streak}-day streak · rank: ${esc(tier.title)}`;
+  const ogTitle = `${emo} ${esc(user)} — ${esc(tier.title)} on ccmap`;
+  const ogDesc = `🔥 ${fmt(d.totals.tokens)} tokens · 💰 $${Math.round(d.totals.cost).toLocaleString()} · 🗓️ ${d.totals.streak}-day streak across Claude + Codex 🤖  👀 See your own coding heatmap → npm i -g @tao-hpu/ccmap`;
   const ogTags = !opts.origin
     ? ""
     : `<meta property="og:type" content="website">
@@ -508,6 +545,17 @@ ${ogTags}
   .rk-track{height:7px;background:rgba(128,128,128,.18);border-radius:5px;overflow:hidden}
   .rk-fill{height:100%;background:var(--accent);border-radius:5px}
   .rk-next{font-size:11px;color:var(--sub);margin-top:6px}
+  .rk-ladder{display:flex;gap:8px;margin:10px 0 6px}
+  .rk-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px;border-radius:10px;border:1px solid var(--line);background:var(--card);opacity:.45;transition:opacity .15s,transform .15s}
+  .rk-step .px{line-height:0;filter:grayscale(.7)}
+  .rk-step.done{opacity:.8}
+  .rk-step.done .px{filter:none}
+  .rk-step.cur{opacity:1;border-color:var(--accent);background:rgba(var(--accent-rgb),.12)}
+  .rk-step.cur .px{filter:none}
+  .rk-step .nm{font-size:9.5px;color:var(--sub);text-align:center;line-height:1.15}
+  .rk-step.cur .nm{color:var(--fg);font-weight:700}
+  .rk-step .th{font-size:9px;color:var(--sub);font-variant-numeric:tabular-nums}
+  .rk-step.cm-active{transform:translateY(-2px)}
   .hl{font-size:13.5px;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin:6px 0 2px;line-height:1.6}
   .hl b{color:var(--accent)}
   .legend{display:flex;gap:16px;font-size:11px;color:var(--sub);margin-top:8px}

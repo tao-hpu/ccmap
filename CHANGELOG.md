@@ -4,6 +4,19 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.6] — 2026-06-23
+
+### Added
+- **Tier ladder** in the report rank card — all six ranks shown as pixel sprites
+  with their token thresholds; your current tier is highlighted, locked tiers
+  dimmed, each hover shows "how far to go".
+
+### Changed
+- **Richer social card.** The `/u/<user>.png` OG image now also embeds your actual
+  full-year heatmap plus a call-to-action footer (`npm i -g @tao-hpu/ccmap` ·
+  ccmap.fim.ai · github). OG/Twitter title & description gained emoji, a per-tier
+  badge, and a "see your own" prompt so the unfurl reads as an invite, not a label.
+
 ## [0.1.5] — 2026-06-23
 
 ### Changed
@@ -89,6 +102,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.6]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.6
 [0.1.5]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.5
 [0.1.4]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.4
 [0.1.3]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.3
