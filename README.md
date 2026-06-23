@@ -18,16 +18,16 @@ That's the whole install (the command is still just `ccmap`). Then:
 
 ```bash
 ccmap scan      # see your usage in the terminal — colored heatmap, no upload, no setup
-ccmap push      # pick a name + publish your badge → <host>/u/<you>.svg
-ccmap start     # keep it fresh: push every 15 min in the background
+ccmap push      # pick a name + publish your badge → https://ccmap.fim.ai/u/<you>.svg
+ccmap start     # keep it fresh: push once a day in the background
 ```
 
 Don't want to install? `npx @tao-hpu/ccmap@latest scan` runs it once, always latest.
 
 > `scan` / `render` / `report` are fully local and need **no setup**. `push` / `start`
-> publish to a badge service — point at your own with `ccmap login --endpoint <url>`
-> (deploy one in seconds, see [Badge server](#badge-server-cloudflare-worker)). A
-> public hosted endpoint is coming; until then, self-host.
+> publish to the public badge service at **`https://ccmap.fim.ai`** (baked in — zero
+> config). Prefer your own server? Point at it with `ccmap login --endpoint <url>`
+> (deploy one in minutes, see [Badge server](#badge-server)).
 
 ## Commands
 
@@ -77,39 +77,44 @@ Published as the scoped package **`@tao-hpu/ccmap`** (the bare `ccmap` name is
 blocked by npm for similarity to `cc-map`); the installed CLI command is still
 `ccmap`. Releases use a 2FA-bypassing automation token in `.env` via `pnpm release`.
 
-## Badge server (Cloudflare Worker)
+## Badge server
 
-The public badge URL is served by a tiny Worker in [`server/`](./server) that
-reuses `src/render.ts`. Deploy it once:
+The default public instance runs at **`https://ccmap.fim.ai`** (baked into the CLI),
+so `ccmap push` needs zero setup. You only need to run your own server if you'd rather
+self-host. Two interchangeable implementations live in this repo — both reuse
+`src/render.ts` / `src/report.ts` and speak the same API:
+
+- **Node** (`src/server.ts`) — zero deps, a JSON-file store. Runs anywhere node does:
+  ```bash
+  pnpm build
+  CCMAP_DATA=/var/lib/ccmap/data.json PORT=3006 node dist/server.js
+  # put it behind nginx/caddy with TLS, then point clients at it:
+  ccmap login --user alice --endpoint https://your.host
+  ```
+- **Cloudflare Worker** (`server/`) — KV-backed, deploy with `wrangler deploy`.
+
+Either way set an optional invite gate by exporting `PUSH_SECRET` (Node) or
+`wrangler secret put PUSH_SECRET` (Worker); clients then pass `ccmap login --invite <code>`.
+
+### How users onboard — 100% CLI, no server account
+
+Only the **operator** runs the server. Each user just runs the CLI against it:
 
 ```bash
-cd server
-pnpm install
-npx wrangler kv namespace create USERS   # paste the printed id into wrangler.toml
-npx wrangler deploy                      # -> https://ccmap.<you>.workers.dev
-# Optional invite gate (keeps the service private):
-#   npx wrangler secret put PUSH_SECRET  # users then pass `ccmap login --invite <code>`
+ccmap push          # claims a name + pushes against the default endpoint, one-shot
+ccmap start         # resident, pushes once a day
+# self-hosting instead? add:  ccmap login --user alice --endpoint https://your.host
 ```
 
-### How users onboard — 100% CLI, no Cloudflare account
-
-Only **you** (the operator) have a Cloudflare account. Each user just runs the CLI:
-
-```bash
-ccmap login --user alice --endpoint https://ccmap.<you>.workers.dev
-#   mints a local secret, claims the name "alice" (POST /api/claim), saves config
-ccmap push          # one-shot
-ccmap start         # resident, pushes every 15 min
-```
-
-Auth model: `login` stores `sha256(key)` server-side under `auth:<user>`; the raw key
-lives only on the user's machine (`~/.ccmap/config.json`). A name, once claimed, can
-only be pushed by the holder of its key. Lose the key = lose the name (v0; no recovery).
+Auth model: `login`/first `push` mints a local secret and stores only `sha256(key)`
+server-side under `auth:<user>`; the raw key lives only on the user's machine
+(`~/.ccmap/config.json`). A name, once claimed, can only be pushed by the holder of its
+key. Lose the key = lose the name (v0; no recovery — back up `~/.ccmap/config.json`).
 
 Embed the badge anywhere (GitHub README renders SVG natively):
 
 ```md
-![my coding heatmap](https://ccmap.<you>.workers.dev/u/taotao.svg)
+![my coding heatmap](https://ccmap.fim.ai/u/taotao.svg)
 ```
 
 ### Query params
@@ -133,18 +138,19 @@ automatically:
 ```html
 <picture>
   <source media="(prefers-color-scheme: dark)"
-          srcset="https://ccmap.<you>.workers.dev/u/taotao.svg?theme=github-dark">
+          srcset="https://ccmap.fim.ai/u/taotao.svg?theme=github-dark">
   <source media="(prefers-color-scheme: light)"
-          srcset="https://ccmap.<you>.workers.dev/u/taotao.svg?theme=github-light">
-  <img src="https://ccmap.<you>.workers.dev/u/taotao.svg?theme=github-dark" alt="coding heatmap">
+          srcset="https://ccmap.fim.ai/u/taotao.svg?theme=github-light">
+  <img src="https://ccmap.fim.ai/u/taotao.svg?theme=github-dark" alt="coding heatmap">
 </picture>
 ```
 
 ## Status
 
-- ✅ Local: `scan` / `render` / `login` / `push` / `start` — verified against real logs.
-- ✅ Server: Cloudflare Worker (`/api/claim`, `/api/push`, `/u/:user.svg`) — full flow
-  verified end-to-end via `wrangler dev` + local KV (claim, per-user auth, badge render).
+- ✅ Local: `scan` / `render` / `report` / `login` / `push` / `start` — verified against real logs.
+- ✅ Server: **live at `https://ccmap.fim.ai`** (Node, `src/server.ts`) — claim, per-user
+  auth, badge + HTML report all verified end-to-end. Cloudflare Worker (`server/`) is an
+  interchangeable alternative.
 - ⏳ PNG route (`/u/:user.png`): SVG covers GitHub/Notion/Slack. PNG (for X/Twitter)
   is one dep away — add `@resvg/resvg-wasm` and a `.png` route.
 - 💡 Ideas backlog: leaderboard, "AI Wrapped" recap card, model fingerprint, streak-only mini badge.

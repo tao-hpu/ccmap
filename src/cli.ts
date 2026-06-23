@@ -13,8 +13,8 @@ import { loadConfig, saveConfig, CONFIG_PATH, type Config } from "./config.js";
 const VERSION = "0.1.0";
 const PKG = "@tao-hpu/ccmap"; // npm package name (scoped; the CLI command is still `ccmap`)
 // Public service URL baked in so newcomers can `ccmap push` with zero setup.
-// Set this to your deployed Worker (e.g. https://ccmap.fim.ai) before publishing.
-const DEFAULT_ENDPOINT = process.env.CCMAP_ENDPOINT ?? "";
+// Override with the CCMAP_ENDPOINT env var or `ccmap login --endpoint <url>`.
+const DEFAULT_ENDPOINT = process.env.CCMAP_ENDPOINT ?? "https://ccmap.fim.ai";
 
 // Public usernames are restricted to a URL-safe slug (they appear in /u/<name>.svg).
 function cleanName(name: string): string {
@@ -278,7 +278,7 @@ async function ensureOnboarded(cfg: Config, explicitUser?: string): Promise<Conf
   if (cfg.user && cfg.token && cfg.endpoint) return cfg;
   const endpoint = cfg.endpoint || DEFAULT_ENDPOINT;
   if (!endpoint) {
-    console.error("no endpoint set. Either this build has no default service, or run once:");
+    console.error("No badge endpoint configured. Point at a server with:");
     console.error("  ccmap login --user <name> --endpoint <url>");
     return null;
   }

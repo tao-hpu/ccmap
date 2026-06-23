@@ -4,6 +4,22 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.1] — 2026-06-23
+
+Zero-config `ccmap push`: a public badge service is now live and baked in.
+
+### Added
+- **Public hosted endpoint** `https://ccmap.fim.ai` baked into the CLI as the
+  default — `ccmap push` works out of the box with no `--endpoint`.
+- **Node badge server** (`src/server.ts`): a zero-dependency `node:http` port of
+  the Cloudflare Worker with a JSON-file store and atomic, flush-on-shutdown
+  persistence. Same routes and trust-on-first-use auth.
+
+### Changed
+- `DEFAULT_ENDPOINT` now points at `https://ccmap.fim.ai` (override with
+  `CCMAP_ENDPOINT` or `ccmap login --endpoint`).
+- Clearer message when no endpoint is configured.
+
 ## [0.1.0] — 2026-06-23
 
 First public release.
@@ -35,4 +51,5 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.1]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.1
 [0.1.0]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.0
