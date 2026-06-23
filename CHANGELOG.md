@@ -4,6 +4,15 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.3] — 2026-06-23
+
+### Fixed
+- `ccmap update` (and the `ccmap start` daily check) used Node's global `fetch`
+  to read the registry, which ignores proxy settings — so it failed with
+  "could not reach npm registry" behind a corporate proxy / VPN even when `npm`
+  itself worked. It now shells out to `npm view`, which honors the user's
+  proxy/registry config.
+
 ## [0.1.2] — 2026-06-23
 
 ### Fixed
@@ -58,6 +67,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.3]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.3
 [0.1.2]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.2
 [0.1.1]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.1
 [0.1.0]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.0

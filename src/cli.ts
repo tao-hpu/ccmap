@@ -79,17 +79,17 @@ function cmpVer(a: string, b: string): number {
   return 0;
 }
 
-async function latestVersion(): Promise<string | null> {
-  try {
-    const r = await fetch(`https://registry.npmjs.org/${PKG}/latest`, {
-      headers: { accept: "application/vnd.npm.install-v1+json" },
-    });
-    if (!r.ok) return null;
-    const j = (await r.json()) as { version?: string };
-    return j.version ?? null;
-  } catch {
-    return null;
-  }
+// Ask npm itself for the latest version rather than fetch()ing the registry
+// directly: `npm` honors the user's proxy/registry config (HTTP_PROXY, .npmrc),
+// while Node's global fetch ignores it and fails behind a corporate proxy/VPN.
+function latestVersion(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const p = spawn("npm", ["view", PKG, "version"], { stdio: ["ignore", "pipe", "ignore"] });
+    let out = "";
+    p.stdout.on("data", (d) => (out += d));
+    p.on("close", (code) => resolve(code === 0 && out.trim() ? out.trim() : null));
+    p.on("error", () => resolve(null));
+  });
 }
 
 function runNpmUpdate(): Promise<number> {
