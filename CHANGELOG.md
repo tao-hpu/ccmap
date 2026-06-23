@@ -4,6 +4,13 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.2] — 2026-06-23
+
+### Fixed
+- CLI version was a hardcoded constant that `npm version` didn't touch, so 0.1.1
+  reported itself as `0.1.0` and the update check nagged endlessly. Version is now
+  read from `package.json` at runtime and can never drift again.
+
 ## [0.1.1] — 2026-06-23
 
 Zero-config `ccmap push`: a public badge service is now live and baked in.
@@ -51,5 +58,6 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.2]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.2
 [0.1.1]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.1
 [0.1.0]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.0

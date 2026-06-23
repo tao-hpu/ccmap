@@ -1,16 +1,27 @@
 #!/usr/bin/env node
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { userInfo } from "node:os";
 import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { scan, currentStreak, type ScanResult } from "./parse.js";
 import { renderSVG, resolveTheme } from "./render.js";
 import { renderReport } from "./report.js";
 import type { DayStat } from "./parse.js";
 import { loadConfig, saveConfig, CONFIG_PATH, type Config } from "./config.js";
 
-const VERSION = "0.1.0";
+// Read from package.json at runtime so the version never drifts from npm.
+// dist/cli.js lives one level under the package root, next to package.json.
+const VERSION: string = (() => {
+  try {
+    const pkg = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+    return JSON.parse(readFileSync(pkg, "utf8")).version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
 const PKG = "@tao-hpu/ccmap"; // npm package name (scoped; the CLI command is still `ccmap`)
 // Public service URL baked in so newcomers can `ccmap push` with zero setup.
 // Override with the CCMAP_ENDPOINT env var or `ccmap login --endpoint <url>`.
