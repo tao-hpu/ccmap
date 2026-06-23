@@ -4,6 +4,15 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.12] — 2026-06-23
+
+### Changed
+- **Redesigned the downloadable portrait card.** Now a slimmer 740×1280 (less
+  empty space on the sides), **square corners** (no rounding on the export), a
+  **smaller mascot**, the heatmap sized to fill the narrower width, and the QR
+  given real breathing room above/below. The brand mark is now the boxed
+  `cc▪map` logo, matching the HTML report's header.
+
 ## [0.1.11] — 2026-06-23
 
 ### Fixed
@@ -174,6 +183,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.12]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.12
 [0.1.11]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.11
 [0.1.10]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.10
 [0.1.9]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.9

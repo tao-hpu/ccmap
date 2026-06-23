@@ -17,8 +17,7 @@ function qrChip(url: string, x: number, y: number, size: number): string {
     for (let col = 0; col < n; col++)
       if (m[r][col])
         dots += `<rect x="${(ox + col * unit).toFixed(2)}" y="${(oy + r * unit).toFixed(2)}" width="${cell}" height="${cell}" fill="#0a0a0a"/>`;
-  const rad = Math.round(card * 0.08);
-  return `<rect x="${x}" y="${y}" width="${card}" height="${card}" rx="${rad}" fill="#ffffff"/><g shape-rendering="crispEdges">${dots}</g>`;
+  return `<rect x="${x}" y="${y}" width="${card}" height="${card}" fill="#ffffff"/><g shape-rendering="crispEdges">${dots}</g>`;
 }
 
 // Normalized input shared by CLI (buildPayload) and Worker (PushPayload).
@@ -473,20 +472,21 @@ export function renderSocialCard(d: ReportData, opts: ReportOptions = {}): strin
 </svg>`;
 }
 
-// A 1080×1350 portrait card for social feeds / 朋友圈 / X — downloadable.
-// Same data as the wide card but stacked, heatmap included.
+// A slender 740×1280 portrait card for social feeds / stories / 朋友圈 —
+// downloadable. Square corners (no rounding) so the exported PNG reads clean;
+// brand mark matches the HTML page's boxed cc▪map logo.
 export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): string {
   const c = resolveTheme(opts.theme);
   const user = d.user || "you";
   const { idx, tier, next } = rankFor(d.totals.tokens);
-  const W = 1080, H = 1350, cx = W / 2;
+  const W = 740, H = 1280, cx = W / 2;
   const font = "-apple-system,Segoe UI,Helvetica,Arial,sans-serif";
   const palette: Record<string, string> = { X: c.scale[3], o: c.scale[1], "#": c.sub };
 
-  // mascot, centered
-  const tile = { s: 340, y: 150 };
+  // mascot tile (smaller, centered)
+  const tile = { s: 210, y: 156 };
   const tx0 = (W - tile.s) / 2;
-  const px = 36, sprite = 8 * px, ox = tx0 + (tile.s - sprite) / 2, oy = tile.y + (tile.s - sprite) / 2;
+  const px = 22, sprite = 8 * px, ox = tx0 + (tile.s - sprite) / 2, oy = tile.y + (tile.s - sprite) / 2;
   let mascot = "";
   for (let y = 0; y < tier.sprite.length; y++)
     for (let x = 0; x < tier.sprite[y].length; x++) {
@@ -494,12 +494,12 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
       if (fill) mascot += `<rect x="${ox + x * px}" y="${oy + y * px}" width="${px}" height="${px}" fill="${fill}"/>`;
     }
 
-  // heatmap, centered — honors the customizer's week selector (default 26).
-  // Cell size adapts so 26w (chunky recent strip) and 53w (full year) both fill
-  // the width; the grid's bottom edge is anchored so the layout below is stable.
+  // heatmap (default 26 weeks); cells sized to fill the narrower card width, the
+  // grid's bottom edge anchored so the QR block below stays put for any week count.
   const weeks = opts.weeks === 53 ? 53 : 26;
-  const ggap = 3, gstep = Math.min(22, Math.floor(880 / weeks)), gcell = gstep - ggap;
-  const gh = 7 * gstep, gw = weeks * gstep, gx = (W - gw) / 2, gy = 1040 - gh;
+  const ggap = 3, gstep = Math.min(22, Math.floor((W - 160) / weeks)), gcell = gstep - ggap;
+  const gh = 7 * gstep, gw = weeks * gstep, gx = (W - gw) / 2;
+  const gridBottom = 858, gy = gridBottom - gh;
   const byDate = new Map<string, number>(d.days.map((x) => [x.date, x.tokens]));
   const vals = d.days.map((x) => x.tokens).filter((v) => v > 0).sort((a, b) => a - b);
   const q = (p: number) => (vals.length ? vals[Math.min(vals.length - 1, Math.floor(p * vals.length))] : 0);
@@ -514,37 +514,40 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
     for (let row = 0; row < 7; row++) {
       if (cur <= today) {
         const v = byDate.get(dKey(cur)) || 0, l = lvl(v);
-        grid += `<rect x="${gx + col * gstep}" y="${gy + row * gstep}" width="${gcell}" height="${gcell}" rx="3" fill="${l < 0 ? emptyFill : c.scale[l]}"/>`;
+        grid += `<rect x="${gx + col * gstep}" y="${gy + row * gstep}" width="${gcell}" height="${gcell}" fill="${l < 0 ? emptyFill : c.scale[l]}"/>`;
       }
       cur.setDate(cur.getDate() + 1);
     }
   }
 
+  const titleSize = tier.title.length > 15 ? 40 : tier.title.length > 11 ? 50 : 60;
   const cost = `$${Math.round(d.totals.cost).toLocaleString()}`;
   const sub = `${cost} · ${d.totals.streak}-day streak · ${d.days.length} active days`;
   const goal = next ? `${fmt(next.min - d.totals.tokens)} tokens to ${esc(next.title)}` : "top tier — ascended";
 
-  // QR linking back to this page — scan it to open the live report.
+  // QR linking back to this page — scan to open the live report.
   const base = (opts.origin || "https://ccmap.fim.ai").replace(/\/$/, "");
   const pageUrl = `${base}/u/${encodeURIComponent(user)}`;
-  const qs = 140, qx = (W - qs) / 2, qy = 1142;
+  const qs = 158, qx = (W - qs) / 2, qy = gridBottom + 132;
+  const goalY = gridBottom + 50, headY = gridBottom + 94, capY = qy + qs + 52;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${font}" xml:space="preserve">
   <rect width="${W}" height="${H}" fill="${c.bg}"/>
-  <rect x="8" y="8" width="${W - 16}" height="${H - 16}" rx="36" fill="none" stroke="${c.border}" stroke-width="2"/>
-  <text x="${cx}" y="96" text-anchor="middle" font-size="40" font-weight="700" fill="${c.scale[2]}">cc<tspan fill="${c.sub}">▪</tspan>map</text>
-  <rect x="${tx0}" y="${tile.y}" width="${tile.s}" height="${tile.s}" rx="30" fill="${c.empty}"/>
+  <rect x="6" y="6" width="${W - 12}" height="${H - 12}" fill="none" stroke="${c.border}" stroke-width="2"/>
+  <rect x="${cx - 74}" y="62" width="148" height="50" rx="9" fill="${c.bg}" stroke="${c.border}" stroke-width="1.5"/>
+  <text x="${cx}" y="97" text-anchor="middle" font-size="30" font-weight="800" fill="${c.text}" letter-spacing="-0.5">cc<tspan fill="${c.scale[2]}">▪</tspan>map</text>
+  <rect x="${tx0}" y="${tile.y}" width="${tile.s}" height="${tile.s}" fill="${c.empty}"/>
   <g shape-rendering="crispEdges">${mascot}</g>
-  <text x="${cx}" y="588" text-anchor="middle" font-size="26" font-weight="600" fill="${c.sub}" letter-spacing="2">RANK ${idx + 1} / ${TIERS.length} · BY TOTAL TOKENS</text>
-  <text x="${cx}" y="666" text-anchor="middle" font-size="76" font-weight="700" fill="${c.text}">${esc(tier.title)}</text>
-  <text x="${cx}" y="716" text-anchor="middle" font-size="30" fill="${c.sub}">@${esc(user)} · Claude + Codex heatmap</text>
-  <text x="${cx}" y="812" text-anchor="middle" font-size="58" font-weight="700" fill="${c.scale[2]}">${fmt(d.totals.tokens)} tokens</text>
-  <text x="${cx}" y="862" text-anchor="middle" font-size="28" fill="${c.sub}">${sub}</text>
+  <text x="${cx}" y="438" text-anchor="middle" font-size="23" font-weight="600" fill="${c.sub}" letter-spacing="2">RANK ${idx + 1} / ${TIERS.length} · BY TOTAL TOKENS</text>
+  <text x="${cx}" y="${438 + titleSize + 8}" text-anchor="middle" font-size="${titleSize}" font-weight="700" fill="${c.text}">${esc(tier.title)}</text>
+  <text x="${cx}" y="${438 + titleSize + 52}" text-anchor="middle" font-size="25" fill="${c.sub}">@${esc(user)} · Claude + Codex heatmap</text>
+  <text x="${cx}" y="640" text-anchor="middle" font-size="50" font-weight="700" fill="${c.scale[2]}">${fmt(d.totals.tokens)} tokens</text>
+  <text x="${cx}" y="680" text-anchor="middle" font-size="25" fill="${c.sub}">${sub}</text>
   <g>${grid}</g>
-  <text x="${cx}" y="1078" text-anchor="middle" font-size="26" fill="${c.sub}">${goal}</text>
-  <text x="${cx}" y="1120" text-anchor="middle" font-size="32" font-weight="700" fill="${c.text}">Get your own coding heatmap</text>
+  <text x="${cx}" y="${goalY}" text-anchor="middle" font-size="24" fill="${c.sub}">${goal}</text>
+  <text x="${cx}" y="${headY}" text-anchor="middle" font-size="29" font-weight="700" fill="${c.text}">Get your own coding heatmap</text>
   ${qrChip(pageUrl, qx, qy, qs)}
-  <text x="${cx}" y="1312" text-anchor="middle" font-size="23" fill="${c.scale[2]}">scan to open · npm i -g @tao-hpu/ccmap</text>
+  <text x="${cx}" y="${capY}" text-anchor="middle" font-size="22" fill="${c.scale[2]}">scan to open · npm i -g @tao-hpu/ccmap</text>
 </svg>`;
 }
 
