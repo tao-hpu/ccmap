@@ -4,6 +4,18 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.7] — 2026-06-23
+
+### Added
+- **Downloadable portrait share card** (1080×1350, heatmap included) for X /
+  朋友圈 / stories — a "Download" button in the report; also at
+  `/u/<user>.png?shape=portrait`.
+- **"Get your own" CTA everywhere** — a persistent sticky button plus a prominent
+  call-to-action section (GitHub button + `npm i -g` install) so a visitor can
+  grab their own heatmap in one click.
+- A big **"Post on X"** button; every share link now carries a fresh cache-bust
+  tag so X always unfurls the latest card instead of a stale one.
+
 ## [0.1.6] — 2026-06-23
 
 ### Added
@@ -102,6 +114,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.7]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.7
 [0.1.6]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.6
 [0.1.5]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.5
 [0.1.4]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.4

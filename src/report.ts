@@ -45,7 +45,12 @@ function build(){
   if(hb)rest+='&hide_border=true';
   var U=BASE+'/u/'+USER+'.svg?theme=';
   var svg=U+t+rest;
-  var report=BASE+'/u/'+USER+(t!=='claude'?'?theme='+t:'');
+  // cache-bust tag so X (and any cache) always re-fetches the freshest card
+  var cb=Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36);
+  var hasQ=(t!=='claude');
+  var report=BASE+'/u/'+USER+(hasQ?'?theme='+t:'')+(hasQ?'&':'?')+'v='+cb;
+  if($('cb-note'))$('cb-note').textContent='?v='+cb;
+  if($('dl'))$('dl').href=BASE+'/u/'+USER+'.png?shape=portrait'+(t!=='claude'?'&theme='+t:'')+'&v='+cb;
   $('preview').src=svg;
   var dark=(t==='claude-light')?'claude':t;
   var light=(t==='claude'||t==='claude-light')?'claude-light':'github-light';
@@ -112,8 +117,9 @@ function shareCard(base: string, user: string): string {
     <img id="preview" class="preview" alt="badge preview">
     <div class="snip"><div class="snip-h"><span>GitHub README · adaptive light/dark ★</span><button onclick="copy('s-pic',this)">copy</button></div><pre><code id="s-pic"></code></pre><div class="note">Follows the viewer's GitHub theme automatically — dark side uses your selected theme above.</div></div>
     <div class="snip"><div class="snip-h"><span>Simple markdown (any host)</span><button onclick="copy('s-md',this)">copy</button></div><pre><code id="s-md"></code></pre></div>
-    <div class="snip"><div class="snip-h"><span>Share link (X / anywhere)</span><a id="tweet" href="#" target="_blank" rel="noopener">post on X →</a><button onclick="copy('s-url',this)">copy</button></div><pre><code id="s-url"></code></pre>
-      <div class="note">X shows the link as a text card (SVG previews aren't rendered by X yet — PNG cards coming). GitHub, Slack &amp; Discord render the badge inline.</div>
+    <div class="snip"><div class="snip-h"><span>Share link (X / anywhere)</span><button onclick="copy('s-url',this)">copy</button></div><pre><code id="s-url"></code></pre>
+      <a id="tweet" class="xbtn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"/></svg>Post on X</a><a id="dl" class="dlbtn" download="ccmap-${user}.png" href="#">⬇ Download card (for X / 朋友圈)</a>
+      <div class="note">「Post on X」unfurls a full image card (your mascot + heatmap), and 「Download」saves a tall portrait PNG to post anywhere. Each share link carries a fresh tag (<code id="cb-note" style="color:var(--accent)"></code>) so caches never go stale. GitHub/Slack/Discord render the SVG badge inline.</div>
     </div>
   </div>`;
 }
@@ -421,6 +427,71 @@ export function renderSocialCard(d: ReportData, opts: ReportOptions = {}): strin
 </svg>`;
 }
 
+// A 1080×1350 portrait card for social feeds / 朋友圈 / X — downloadable.
+// Same data as the wide card but stacked, heatmap included.
+export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): string {
+  const c = resolveTheme(opts.theme);
+  const user = d.user || "you";
+  const { idx, tier, next } = rankFor(d.totals.tokens);
+  const W = 1080, H = 1350, cx = W / 2;
+  const font = "-apple-system,Segoe UI,Helvetica,Arial,sans-serif";
+  const palette: Record<string, string> = { X: c.scale[3], o: c.scale[1], "#": c.sub };
+
+  // mascot, centered
+  const tile = { s: 340, y: 150 };
+  const tx0 = (W - tile.s) / 2;
+  const px = 36, sprite = 8 * px, ox = tx0 + (tile.s - sprite) / 2, oy = tile.y + (tile.s - sprite) / 2;
+  let mascot = "";
+  for (let y = 0; y < tier.sprite.length; y++)
+    for (let x = 0; x < tier.sprite[y].length; x++) {
+      const fill = palette[tier.sprite[y][x]];
+      if (fill) mascot += `<rect x="${ox + x * px}" y="${oy + y * px}" width="${px}" height="${px}" fill="${fill}"/>`;
+    }
+
+  // heatmap, centered
+  const weeks = 53, gcell = 14, ggap = 3, gstep = gcell + ggap;
+  const gw = weeks * gstep, gx = (W - gw) / 2, gy = 940;
+  const byDate = new Map<string, number>(d.days.map((x) => [x.date, x.tokens]));
+  const vals = d.days.map((x) => x.tokens).filter((v) => v > 0).sort((a, b) => a - b);
+  const q = (p: number) => (vals.length ? vals[Math.min(vals.length - 1, Math.floor(p * vals.length))] : 0);
+  const t1 = q(0.25), t2 = q(0.5), t3 = q(0.75);
+  const lvl = (v: number) => (v <= 0 ? -1 : v <= t1 ? 0 : v <= t2 ? 1 : v <= t3 ? 2 : 3);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(today); start.setDate(start.getDate() - (weeks - 1) * 7 - today.getDay());
+  let grid = "";
+  const cur = new Date(start);
+  for (let col = 0; col < weeks; col++) {
+    for (let row = 0; row < 7; row++) {
+      if (cur <= today) {
+        const v = byDate.get(dKey(cur)) || 0, l = lvl(v);
+        grid += `<rect x="${gx + col * gstep}" y="${gy + row * gstep}" width="${gcell}" height="${gcell}" rx="3" fill="${l < 0 ? c.empty : c.scale[l]}"/>`;
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
+  const cost = `$${Math.round(d.totals.cost).toLocaleString()}`;
+  const sub = `${cost} · ${d.totals.streak}-day streak · ${d.days.length} active days`;
+  const goal = next ? `${fmt(next.min - d.totals.tokens)} tokens to ${esc(next.title)}` : "top tier — ascended 🛸";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${font}" xml:space="preserve">
+  <rect width="${W}" height="${H}" fill="${c.bg}"/>
+  <rect x="8" y="8" width="${W - 16}" height="${H - 16}" rx="36" fill="none" stroke="${c.border}" stroke-width="2"/>
+  <text x="${cx}" y="96" text-anchor="middle" font-size="40" font-weight="700" fill="${c.scale[2]}">cc<tspan fill="${c.sub}">▪</tspan>map</text>
+  <rect x="${tx0}" y="${tile.y}" width="${tile.s}" height="${tile.s}" rx="30" fill="${c.empty}"/>
+  <g shape-rendering="crispEdges">${mascot}</g>
+  <text x="${cx}" y="588" text-anchor="middle" font-size="26" font-weight="600" fill="${c.sub}" letter-spacing="2">RANK ${idx + 1} / ${TIERS.length} · BY TOTAL TOKENS</text>
+  <text x="${cx}" y="666" text-anchor="middle" font-size="76" font-weight="700" fill="${c.text}">${esc(tier.title)}</text>
+  <text x="${cx}" y="716" text-anchor="middle" font-size="30" fill="${c.sub}">@${esc(user)} · Claude + Codex heatmap</text>
+  <text x="${cx}" y="812" text-anchor="middle" font-size="58" font-weight="700" fill="${c.scale[2]}">${fmt(d.totals.tokens)} tokens</text>
+  <text x="${cx}" y="862" text-anchor="middle" font-size="28" fill="${c.sub}">${sub}</text>
+  <g>${grid}</g>
+  <text x="${cx}" y="1110" text-anchor="middle" font-size="26" fill="${c.sub}">${goal}</text>
+  <text x="${cx}" y="1210" text-anchor="middle" font-size="32" font-weight="700" fill="${c.text}">Get your own coding heatmap</text>
+  <text x="${cx}" y="1256" text-anchor="middle" font-size="28" fill="${c.scale[2]}">npm i -g @tao-hpu/ccmap  ·  github.com/tao-hpu/ccmap</text>
+</svg>`;
+}
+
 function bars(items: [string, number][], total: number, c: ReturnType<typeof resolveTheme>): string {
   const top = Math.max(1, ...items.map((it) => it[1]));
   return items
@@ -573,6 +644,21 @@ ${ogTags}
   .snip-h span{flex:1}
   .snip-h button,.snip-h a{font:12px inherit;background:none;border:1px solid var(--line);color:var(--accent);border-radius:6px;padding:2px 10px;cursor:pointer;text-decoration:none}
   .note{font-size:11px;color:var(--sub);margin-top:8px;line-height:1.5}
+  .xbtn{display:inline-flex;align-items:center;gap:9px;margin-top:12px;padding:13px 26px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;border:none;border-radius:11px;text-decoration:none;cursor:pointer;box-shadow:0 4px 14px rgba(var(--accent-rgb),.35);transition:transform .12s ease,filter .12s ease}
+  .xbtn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+  .xbtn svg{width:20px;height:20px;fill:currentColor}
+  .dlbtn{display:inline-flex;align-items:center;gap:8px;margin:12px 0 0 10px;padding:12px 22px;background:transparent;color:var(--accent);font-size:15px;font-weight:700;border:1.5px solid var(--accent);border-radius:11px;text-decoration:none;cursor:pointer;transition:background .12s}
+  .dlbtn:hover{background:rgba(var(--accent-rgb),.12)}
+  .cta{margin:32px 0 8px;padding:28px 26px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,rgba(var(--accent-rgb),.10),var(--card));text-align:center}
+  .cta-h{font-size:25px;font-weight:800}
+  .cta-sub{font-size:14px;color:var(--sub);margin:7px 0 18px}
+  .cta-row{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap}
+  .cta-btn{display:inline-flex;align-items:center;padding:13px 26px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;border-radius:11px;text-decoration:none;box-shadow:0 4px 14px rgba(var(--accent-rgb),.35);transition:transform .12s,filter .12s}
+  .cta-btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+  .cta-code{font:13px ui-monospace,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:11px 16px;color:var(--fg)}
+  .getyours{position:fixed;right:18px;bottom:18px;z-index:50;display:inline-flex;align-items:center;gap:7px;padding:12px 19px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;border-radius:999px;text-decoration:none;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+  .getyours:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  @media(max-width:560px){.getyours{right:10px;bottom:10px;padding:10px 15px;font-size:13px}}
   pre{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
   pre::-webkit-scrollbar{height:8px}
   pre::-webkit-scrollbar-track{background:transparent;border-radius:8px}
@@ -620,12 +706,22 @@ ${ogTags}
 
   ${opts.share ? shareCard(opts.origin || "https://YOUR-CCMAP-HOST", user) : ""}
 
+  ${opts.share ? `<div class="cta">
+    <div class="cta-h">Want your own? 🚀</div>
+    <div class="cta-sub">A GitHub-style heatmap of your Claude Code + Codex usage — free, 100% local, set up in 30 seconds.</div>
+    <div class="cta-row">
+      <a class="cta-btn" href="${GITHUB}" target="_blank" rel="noopener">★ Get it on GitHub →</a>
+      <code class="cta-code">npm i -g @tao-hpu/ccmap</code>
+    </div>
+  </div>` : ""}
+
   <div id="tip" class="tip"></div>
 
   <footer>generated by <a href="${GITHUB}">ccmap</a> · <a href="https://www.npmjs.com/package/@tao-hpu/ccmap">npm</a>${
     badge ? ` · <a href="${badge}">badge</a>` : ""
   }</footer>
 </div>
+${opts.share ? `<a class="getyours" href="${GITHUB}" target="_blank" rel="noopener">⚡ Get your own ↗</a>` : ""}
 <script>${opts.share ? `const BASE=${JSON.stringify(opts.origin || "https://YOUR-CCMAP-HOST")},USER=${JSON.stringify(user)};${SHARE_JS}` : ""}${TOOLTIP_JS}</script>
 </body></html>`;
 }

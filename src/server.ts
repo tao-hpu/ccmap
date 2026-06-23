@@ -17,7 +17,7 @@ import { readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderSVG, resolveTheme } from "./render.js";
-import { renderReport, renderSocialCard } from "./report.js";
+import { renderReport, renderSocialCard, renderPortraitCard } from "./report.js";
 
 const PORT = Number(process.env.PORT || 3006);
 const DATA = process.env.CCMAP_DATA || "./ccmap-data.json";
@@ -236,15 +236,19 @@ async function handlePng(user: string, url: URL, res: ServerResponse): Promise<v
   if (!raw) return send(res, 404, "not found");
   const p = JSON.parse(raw) as PushPayload;
   const theme = url.searchParams.get("theme") || "claude";
-  // ?card=badge → rasterize the heatmap badge; default → the tier-mascot OG card.
+  const data = { user, totals: p.totals, byModel: p.byModel, days: p.days };
+  // ?shape=portrait → tall downloadable card; ?card=badge → heatmap badge;
+  // default → the wide tier-mascot OG card.
   const svg =
-    url.searchParams.get("card") === "badge"
-      ? renderSVG(
-          daysToMap(p),
-          { totalTokens: p.totals.tokens, totalCost: p.totals.cost, streak: p.totals.streak },
-          { metric: "tokens", theme, weeks: 26, border: true, title: `${user} · coding heatmap` }
-        )
-      : renderSocialCard({ user, totals: p.totals, byModel: p.byModel, days: p.days }, { theme });
+    url.searchParams.get("shape") === "portrait"
+      ? renderPortraitCard(data, { theme })
+      : url.searchParams.get("card") === "badge"
+        ? renderSVG(
+            daysToMap(p),
+            { totalTokens: p.totals.tokens, totalCost: p.totals.cost, streak: p.totals.streak },
+            { metric: "tokens", theme, weeks: 26, border: true, title: `${user} · coding heatmap` }
+          )
+        : renderSocialCard(data, { theme });
   // Strip emoji (🔥 etc.) for the raster path — resvg has no emoji font (tofu).
   const pngSvg = svg.replace(/\p{Extended_Pictographic}️?\s?/gu, "");
   try {
