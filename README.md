@@ -18,7 +18,7 @@ That's the whole install (the command is still just `ccmap`). Then:
 
 ```bash
 ccmap scan      # see your usage in the terminal — colored heatmap, no upload, no setup
-ccmap push      # pick a name + publish your badge → https://ccmap.fim.ai/u/<you>.svg
+ccmap push      # claim a name + publish → your report page at https://ccmap.fim.ai/u/<you>
 ccmap start     # keep it fresh: push once a day in the background
 ```
 
@@ -26,20 +26,35 @@ Don't want to install? `npx @tao-hpu/ccmap@latest scan` runs it once, always lat
 
 > `scan` / `render` / `report` are fully local and need **no setup**. `push` / `start`
 > publish to the public badge service at **`https://ccmap.fim.ai`** (baked in — zero
-> config). Prefer your own server? Point at it with `ccmap login --endpoint <url>`
-> (deploy one in minutes, see [Badge server](#badge-server)).
+> config). Running your own is possible too — see [Self-hosting](#self-hosting-optional).
 
 ## Commands
 
+**Local only — no setup, nothing leaves your machine:**
+
 | Command | What it does |
 | --- | --- |
-| `ccmap scan` | Summarize local usage (tokens, est. cost, streak, model mix) + terminal heatmap. No upload. |
+| `ccmap scan` | Summarize local usage (tokens, est. cost, streak, model mix) + terminal heatmap. |
 | `ccmap render [--out f.svg] [--theme …] [--anim ember\|wave\|cascade] [--metric tokens\|cost] [--weeks 26] [--border] [--rounded]` | Render a heatmap SVG locally. |
 | `ccmap report [--out f.html]` | Render a full shareable HTML report (with a live customizer). |
-| `ccmap push [--user <name>]` | Publish your data. First run picks a username: on a terminal it **prompts** you (default = your OS name); non-interactively it uses the default. Override with `--user` or the `CCMAP_USER` env var. |
-| `ccmap start` | Resident: push every `interval` minutes (also checks for updates daily). |
-| `ccmap login --user <name> --endpoint <url>` | Optional: pick a specific username / point at your own server. |
+
+**Publish & keep fresh** (uses the public badge service at `https://ccmap.fim.ai` — zero config):
+
+| Command | What it does |
+| --- | --- |
+| `ccmap push [--user <name>]` | Publish your aggregates → prints your **report page** (`/u/<you>`: heatmap, stats, live badge customizer) and an embeddable **badge SVG** (`/u/<you>.svg`). First run **auto-claims** a username (prompts on a terminal, default = your OS name; set it with `--user` or `CCMAP_USER`) — **no separate login step**. |
+| `ccmap start [--foreground]` | Schedule a daily background push via launchd/cron (survives logout/reboot, no terminal needed). `--foreground` runs an attached loop. |
+| `ccmap stop` | Remove the scheduled push. |
+| `ccmap status` | Show the schedule + last push. |
+
+**Housekeeping:**
+
+| Command | What it does |
+| --- | --- |
+| `ccmap config [--interval <min>] [--metric tokens\|cost] [--theme …] [--weeks 26]` | View / update saved settings in `~/.ccmap/config.json`. |
 | `ccmap update` | Self-update to the latest published version. |
+| `ccmap version` · `ccmap help` | Print version / usage. |
+| `ccmap login --user <name> --endpoint <url> [--invite <code>]` | **Optional / advanced.** Only needed to claim a *specific* username or point at a self-hosted server — plain `push` already auto-claims against the default service. |
 
 ## Data sources
 
@@ -95,41 +110,13 @@ Published as the scoped package **`@tao-hpu/ccmap`** (the bare `ccmap` name is
 blocked by npm for similarity to `cc-map`); the installed CLI command is still
 `ccmap`. Releases use a 2FA-bypassing automation token in `.env` via `pnpm release`.
 
-## Badge server
+## Your report page & badge
 
-The default public instance runs at **`https://ccmap.fim.ai`** (baked into the CLI),
-so `ccmap push` needs zero setup. You only need to run your own server if you'd rather
-self-host. Two interchangeable implementations live in this repo — both reuse
-`src/render.ts` / `src/report.ts` and speak the same API:
+`ccmap push` gives you a **report page** at `https://ccmap.fim.ai/u/<you>` — the full
+heatmap, stats, and a **live customizer** (theme / weeks / animation) that generates
+ready-to-paste embed snippets, including the auto light/dark `<picture>` block below.
 
-- **Node** (`src/server.ts`) — zero deps, a JSON-file store. Runs anywhere node does:
-  ```bash
-  pnpm build
-  CCMAP_DATA=/var/lib/ccmap/data.json PORT=3006 node dist/server.js
-  # put it behind nginx/caddy with TLS, then point clients at it:
-  ccmap login --user alice --endpoint https://your.host
-  ```
-- **Cloudflare Worker** (`server/`) — KV-backed, deploy with `wrangler deploy`.
-
-Either way set an optional invite gate by exporting `PUSH_SECRET` (Node) or
-`wrangler secret put PUSH_SECRET` (Worker); clients then pass `ccmap login --invite <code>`.
-
-### How users onboard — 100% CLI, no server account
-
-Only the **operator** runs the server. Each user just runs the CLI against it:
-
-```bash
-ccmap push          # claims a name + pushes against the default endpoint, one-shot
-ccmap start         # resident, pushes once a day
-# self-hosting instead? add:  ccmap login --user alice --endpoint https://your.host
-```
-
-Auth model: `login`/first `push` mints a local secret and stores only `sha256(key)`
-server-side under `auth:<user>`; the raw key lives only on the user's machine
-(`~/.ccmap/config.json`). A name, once claimed, can only be pushed by the holder of its
-key. Lose the key = lose the name (v0; no recovery — back up `~/.ccmap/config.json`).
-
-Embed the badge anywhere (GitHub README renders SVG natively):
+Grab the badge SVG from there, or embed it directly (GitHub renders SVG natively):
 
 ```md
 ![my coding heatmap](https://ccmap.fim.ai/u/taotao.svg)
@@ -163,6 +150,20 @@ automatically:
   <img src="https://ccmap.fim.ai/u/taotao.svg?theme=github-dark" alt="coding heatmap">
 </picture>
 ```
+
+## Self-hosting (optional)
+
+Most people just use the public service. But if you'd rather keep data in-house
+(e.g. inside a company), the repo ships the badge server too — point the CLI at it
+with `ccmap login --endpoint <url>` (that's the one reason to use `login`). Two
+interchangeable backends, same API:
+
+- **Node** — `src/server.ts`, zero-dep JSON-file store: `node dist/server.js` (env `CCMAP_DATA`, `PORT`).
+- **Cloudflare Worker** — `server/`, KV-backed: `wrangler deploy`.
+
+Optional write gate: set `PUSH_SECRET`; clients pass `ccmap login --invite <code>`.
+Auth is keyless on the server side — first push mints a local secret, the server
+stores only its `sha256` (back up `~/.ccmap/config.json`).
 
 ## Status
 
