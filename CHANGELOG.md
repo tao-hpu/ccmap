@@ -4,6 +4,24 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.14] — 2026-06-23
+
+### Fixed
+- **Mobile horizontal overflow on the report page.** The Activity heatmap (a fixed
+  ~774px full-year SVG) and the weekday radar were emitted at fixed pixel widths
+  and spilled off narrow screens. Both now scale to the card width
+  (`max-width:100%`), the CTA install command no longer pushes the layout wide, and
+  a small-screen guard tightens padding and stacks the rank card.
+- **Models chart bar was getting crushed.** The model-name label and value columns
+  were fixed at 200px/120px, leaving almost no room for the bar between them. The
+  label now shrinks (with an ellipsis) and the value column is slimmer, so the bar
+  itself gets the space — and stays readable on mobile.
+
+### Changed
+- **"Customize & share" is collapsed by default.** It's now a `<details>` panel —
+  tap the header to expand the customizer, embed snippets, and share buttons — so
+  the report leads with the stats instead of a wall of options.
+
 ## [0.1.13] — 2026-06-23
 
 ### Fixed
@@ -191,6 +209,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.14]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.14
 [0.1.13]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.13
 [0.1.12]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.12
 [0.1.11]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.11

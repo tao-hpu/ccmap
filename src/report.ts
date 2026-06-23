@@ -147,7 +147,7 @@ const TOOLTIP_JS = `
 
 function shareCard(base: string, user: string): string {
   const opts = THEME_NAMES.map((t) => `<option${t === "claude" ? " selected" : ""}>${t}</option>`).join("");
-  return `<div class="card"><h2>Customize &amp; share</h2>
+  return `<details class="card fold"><summary><span>Customize &amp; share</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary><div class="fold-b">
     <div class="ctl">
       <label>theme <select id="t" oninput="build()">${opts}</select></label>
       <label>anim <select id="a" oninput="build()"><option>none</option><option>ember</option><option>wave</option><option>cascade</option></select></label>
@@ -165,7 +165,7 @@ function shareCard(base: string, user: string): string {
       </div>
       <div class="note">Post on X unfurls a full image card (mascot + heatmap); Download saves a tall portrait PNG (with a scannable QR back to your page) for X, stories, or anywhere. Each share link carries a fresh tag (<code id="cb-note" style="color:var(--accent)"></code>) so caches never go stale — GitHub, Slack and Discord render the SVG badge inline.</div>
     </div>
-  </div>`;
+  </div></details>`;
 }
 
 // Stacked SVG bar chart of the last `n` days — Codex on the bottom, Claude on top.
@@ -318,7 +318,7 @@ function radarWeekday(days: ReportData["days"], c: ReturnType<typeof resolveThem
       return `<circle class="hit" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="12" fill="transparent" pointer-events="all"><title>${tip}</title></circle><circle class="dot" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3.4" fill="${c.scale[3]}" pointer-events="none"/>`;
     })
     .join("");
-  return `<div style="display:flex;justify-content:center"><svg viewBox="0 0 300 290" width="300" height="290">${rings}${axes}<polygon points="${dp}" fill="${c.scale[2]}" fill-opacity="0.22" stroke="${c.scale[3]}" stroke-width="2"/>${dots}${labels}</svg></div>`;
+  return `<div style="display:flex;justify-content:center"><svg viewBox="0 0 300 290" width="300" height="290" style="max-width:100%;height:auto">${rings}${axes}<polygon points="${dp}" fill="${c.scale[2]}" fill-opacity="0.22" stroke="${c.scale[3]}" stroke-width="2"/>${dots}${labels}</svg></div>`;
 }
 
 // Cohesive 16×16 stroke icon set for the stat cards.
@@ -579,7 +579,9 @@ export function renderReport(d: ReportData, opts: ReportOptions = {}): string {
   const daysMap = new Map<string, any>();
   for (const x of d.days)
     daysMap.set(x.date, { date: x.date, tokens: x.tokens, cost: x.cost, bySource: { claude: x.claude, codex: x.codex }, byModel: {}, sessions: new Set() });
-  const heat = renderSVG(daysMap, { totalTokens: d.totals.tokens, totalCost: d.totals.cost, streak: d.totals.streak }, { theme: opts.theme ?? "claude", weeks: 53, anim: "cascade", border: false, title: "" });
+  const heat = renderSVG(daysMap, { totalTokens: d.totals.tokens, totalCost: d.totals.cost, streak: d.totals.streak }, { theme: opts.theme ?? "claude", weeks: 53, anim: "cascade", border: false, title: "" })
+    // inline at fixed px → overflows narrow screens; let it scale to the card width
+    .replace("<svg ", `<svg style="max-width:100%;height:auto" `);
 
   const topModels = Object.entries(d.byModel).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const src = d.totals.bySource;
@@ -667,13 +669,22 @@ ${ogTags}
   .tip.on{opacity:1}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin:18px 0}
   .card h2{font-size:14px;margin:0 0 14px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  /* collapsible "Customize & share" — folded by default */
+  .fold{padding:0;overflow:hidden}
+  .fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:16px 18px;font-size:14px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;-webkit-tap-highlight-color:transparent}
+  .fold>summary::-webkit-details-marker{display:none}
+  .fold>summary span{flex:1}
+  .fold>summary .chev{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
+  .fold[open]>summary .chev{transform:rotate(180deg)}
+  .fold>summary:hover{color:var(--fg)}
+  .fold-b{padding:0 18px 18px}
   .row{display:flex;align-items:center;gap:10px;margin:4px -8px;padding:3px 8px;border-radius:7px;transition:background .1s}
   .row.cm-active{background:rgba(var(--accent-rgb),.09)}
-  .lbl{width:200px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .track{flex:1;height:8px;background:rgba(128,128,128,.18);border-radius:5px;overflow:hidden}
+  .lbl{flex:0 1 150px;min-width:60px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .track{flex:1 1 70px;min-width:48px;height:8px;background:rgba(128,128,128,.18);border-radius:5px;overflow:hidden}
   .fill{height:100%;background:var(--accent);border-radius:5px;transition:filter .1s}
   .row.cm-active .fill{filter:brightness(1.3)}
-  .val{width:120px;text-align:right;font-size:12px;color:var(--sub)}
+  .val{flex:0 0 auto;width:96px;text-align:right;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
   .rank{display:flex;gap:18px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:22px 0 6px}
   .rk-icon{flex:none;line-height:0;padding:6px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
   .rk-body{flex:1;min-width:0}
@@ -733,8 +744,8 @@ ${ogTags}
   .ic{width:1.05em;height:1.05em;vertical-align:-.16em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
   .ic-fill{fill:currentColor;stroke:none}
   .cta-h .ic{width:.9em;height:.9em;vertical-align:-.06em;margin-left:6px}
-  .cta-copy{display:inline-flex;align-items:center;height:48px;background:var(--bg);border:1px solid var(--line);border-radius:11px;overflow:hidden}
-  .cta-copy code{padding:0 14px;white-space:nowrap}
+  .cta-copy{display:inline-flex;align-items:center;height:48px;max-width:100%;background:var(--bg);border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .cta-copy code{padding:0 14px;white-space:nowrap;overflow-x:auto}
   .cta-copy button{align-self:stretch;border:none;border-left:1px solid var(--line);background:transparent;color:var(--accent);font:13px inherit;font-weight:700;padding:0 16px;cursor:pointer;transition:background .12s}
   .cta-copy button:hover{background:rgba(var(--accent-rgb),.1)}
   pre{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
@@ -743,6 +754,15 @@ ${ogTags}
   pre::-webkit-scrollbar-thumb{background:var(--accent);border-radius:8px;border:2px solid var(--bg)}
   pre::-webkit-scrollbar-thumb:hover{filter:brightness(1.15)}
   code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fg);white-space:pre}
+  @media(max-width:560px){
+    body{overflow-x:hidden}
+    .wrap{padding:26px 14px 56px}
+    .lbl{flex-basis:104px;min-width:0}
+    .val{width:80px;font-size:11px}
+    .split{gap:14px}
+    .rank{flex-direction:column;text-align:center}
+    .rk-body{width:100%}
+  }
 </style></head><body><div class="wrap">
   <div class="head"><span class="brand-mark">cc<span class="brand-dot">▪</span>map</span><h1>${esc(user)} <span class="muted">· coding report</span></h1></div>
   <div class="muted">Claude + Codex coding heatmap · ${range}</div>
