@@ -65,12 +65,13 @@ const SHARE_JS = `
 function $(id){return document.getElementById(id)}
 function setText(id,v){$(id).textContent=v}
 function build(){
-  var t=$('t').value,a=$('a').value,m=$('m').value,w=$('w').value,hb=$('hb').checked;
+  var t=$('t').value,a=$('a').value,m=$('m').value,w=$('w').value,bd=$('bd').checked,rd=$('rd').checked;
   var rest='';
   if(a!=='none')rest+='&anim='+a;
   if(m!=='tokens')rest+='&metric='+m;
   if(w!=='26')rest+='&weeks='+w;
-  if(hb)rest+='&hide_border=true';
+  if(bd)rest+='&border=true';
+  if(rd)rest+='&rounded=true';
   var U=BASE+'/u/'+USER+'.svg?theme=';
   var svg=U+t+rest;
   // cache-bust tag so X (and any cache) always re-fetches the freshest card
@@ -140,7 +141,8 @@ function shareCard(base: string, user: string): string {
       <label>anim <select id="a" oninput="build()"><option>none</option><option>ember</option><option>wave</option><option>cascade</option></select></label>
       <label>metric <select id="m" oninput="build()"><option>tokens</option><option>cost</option></select></label>
       <label>weeks <select id="w" oninput="build()"><option>26</option><option>53</option></select></label>
-      <label class="cb"><input type="checkbox" id="hb" oninput="build()"> hide border</label>
+      <label class="cb"><input type="checkbox" id="bd" oninput="build()"> border</label>
+      <label class="cb"><input type="checkbox" id="rd" oninput="build()"> rounded corners</label>
     </div>
     <img id="preview" class="preview" alt="badge preview">
     <div class="snip"><div class="snip-h"><span>GitHub README · adaptive light/dark</span><button onclick="copy('s-pic',this)">copy</button></div><pre><code id="s-pic"></code></pre><div class="note">Follows the viewer's GitHub theme automatically — dark side uses your selected theme above.</div></div>
@@ -590,7 +592,7 @@ export function renderReport(d: ReportData, opts: ReportOptions = {}): string {
 <meta property="og:title" content="${ogTitle}">
 <meta property="og:description" content="${ogDesc}">
 <meta property="og:image" content="${ogImg}">
-<meta property="og:image:width" content="1200"><meta property="og:image:height" content="539">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${ogTitle}">
 <meta name="twitter:description" content="${ogDesc}">

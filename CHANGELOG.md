@@ -4,6 +4,22 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.10] — 2026-06-23
+
+### Fixed
+- **X/social card was cropping off the heatmap.** `og:image:height` was declared
+  as `539` while the card is actually `1200×630`, so X trusted the wrong ratio
+  and sliced off the bottom (heatmap + footer). Now declared correctly — the full
+  card, heatmap included, unfurls. (Re-share with a fresh link: X caches per-URL,
+  and the in-report "Post on X" button already appends a cache-bust tag.)
+
+### Changed
+- **Badge defaults to no border and square corners.** The embed customizer's
+  "hide border" checkbox is replaced by opt-in **border** and **rounded corners**
+  toggles (both off by default); query params are now `?border=true` /
+  `?rounded=true` (CLI: `--border` / `--rounded`). Bare badge URLs render clean
+  and square out of the box.
+
 ## [0.1.9] — 2026-06-23
 
 ### Changed
@@ -143,6 +159,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.10]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.10
 [0.1.9]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.9
 [0.1.8]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.8
 [0.1.7]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.7

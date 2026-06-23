@@ -34,7 +34,7 @@ Don't want to install? `npx @tao-hpu/ccmap@latest scan` runs it once, always lat
 | Command | What it does |
 | --- | --- |
 | `ccmap scan` | Summarize local usage (tokens, est. cost, streak, model mix) + terminal heatmap. No upload. |
-| `ccmap render [--out f.svg] [--theme …] [--anim ember\|wave\|cascade] [--metric tokens\|cost] [--weeks 26]` | Render a heatmap SVG locally. |
+| `ccmap render [--out f.svg] [--theme …] [--anim ember\|wave\|cascade] [--metric tokens\|cost] [--weeks 26] [--border] [--rounded]` | Render a heatmap SVG locally. |
 | `ccmap report [--out f.html]` | Render a full shareable HTML report (with a live customizer). |
 | `ccmap push [--user <name>]` | Publish your data. First run picks a username: on a terminal it **prompts** you (default = your OS name); non-interactively it uses the default. Override with `--user` or the `CCMAP_USER` env var. |
 | `ccmap start` | Resident: push every `interval` minutes (also checks for updates daily). |
@@ -124,7 +124,8 @@ Embed the badge anywhere (GitHub README renders SVG natively):
 | `theme` | `github-dark` `github-light` `tokyo-night` `dracula` `nord` (`dark`/`light` aliases) | `github-dark` |
 | `metric` | `tokens` `cost` | `tokens` |
 | `weeks` | `1..53` | `26` |
-| `hide_border` | `true` `false` | `false` |
+| `border` | `true` `false` | `false` |
+| `rounded` | `true` `false` | `false` |
 
 Add themes by editing the `THEMES` registry in `src/render.ts` — each is just a
 palette, instantly available as `?theme=<name>`.

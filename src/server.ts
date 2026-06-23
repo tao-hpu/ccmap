@@ -174,12 +174,15 @@ function handleBadge(user: string, url: URL, res: ServerResponse): void {
   const metric = (url.searchParams.get("metric") as "tokens" | "cost") || "tokens";
   const theme = url.searchParams.get("theme") || "claude";
   const weeks = Number(url.searchParams.get("weeks") || 26);
-  const hideBorder = url.searchParams.get("hide_border") === "true";
+  // default: no border, square corners (?border=true / ?rounded=true to add).
+  // legacy ?hide_border= still understood but moot now that border is off by default.
+  const border = url.searchParams.get("border") === "true";
+  const rounded = url.searchParams.get("rounded") === "true";
   const anim = url.searchParams.get("anim") || "none";
   const svg = renderSVG(
     daysToMap(p),
     { totalTokens: p.totals.tokens, totalCost: p.totals.cost, streak: p.totals.streak },
-    { metric, theme, weeks, anim, border: !hideBorder, title: `${user} · coding heatmap` }
+    { metric, theme, weeks, anim, border, rounded, title: `${user} · coding heatmap` }
   );
   send(res, 200, svg, {
     "content-type": "image/svg+xml; charset=utf-8",
@@ -246,7 +249,7 @@ async function handlePng(req: IncomingMessage, user: string, url: URL, res: Serv
         ? renderSVG(
             daysToMap(p),
             { totalTokens: p.totals.tokens, totalCost: p.totals.cost, streak: p.totals.streak },
-            { metric: "tokens", theme, weeks: 26, border: true, title: `${user} · coding heatmap` }
+            { metric: "tokens", theme, weeks: 26, title: `${user} · coding heatmap` }
           )
         : renderSocialCard(data, { theme });
   // Strip emoji (🔥 etc.) for the raster path — resvg has no emoji font (tofu).

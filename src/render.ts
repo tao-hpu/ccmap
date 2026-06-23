@@ -5,7 +5,8 @@ export interface RenderOptions {
   metric?: "tokens" | "cost"; // what the color intensity represents
   title?: string;
   theme?: string; // named theme, see THEMES
-  border?: boolean; // draw the card border (default true; ?hide_border=true to drop)
+  border?: boolean; // draw the card border (default false; ?border=true to add)
+  rounded?: boolean; // round the card + cell corners (default false = square; ?rounded=true)
   anim?: string; // "none" | "ember" | "wave" | "cascade"
 }
 
@@ -97,7 +98,9 @@ export function renderSVG(
   const weeks = opts.weeks ?? 26;
   const metric = opts.metric ?? "tokens";
   const c = resolveTheme(opts.theme);
-  const border = opts.border !== false;
+  const border = opts.border === true; // default: no border
+  const cellR = opts.rounded ? 2 : 0; // default: square corners
+  const cardR = opts.rounded ? 8 : 0;
 
   // build grid ending today; columns = weeks, align so last column ends on today's weekday
   const today = new Date();
@@ -165,7 +168,7 @@ export function renderSVG(
     else if (anim === "cascade") delay = order * 0.012;
     const attr = animated ? ` class="g" style="animation-delay:${delay.toFixed(2)}s"` : "";
     cells.push(
-      `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"${attr}><title>${tip}</title></rect>`
+      `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="${cellR}" fill="${fill}"${attr}><title>${tip}</title></rect>`
     );
     order++;
     row++;
@@ -202,7 +205,7 @@ export function renderSVG(
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
   ${animCss(anim)}
-  <rect x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" rx="8" fill="${c.bg}"${border ? ` stroke="${c.border}"` : ""}/>
+  <rect x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" rx="${cardR}" fill="${c.bg}"${border ? ` stroke="${c.border}"` : ""}/>
   <text x="${padX}" y="26" fill="${c.text}" font-size="15" font-weight="600">${title}</text>
   <text x="${padX}" y="46" fill="${c.sub}" font-size="12">${sub}</text>
   ${monthLabels.join("\n  ")}

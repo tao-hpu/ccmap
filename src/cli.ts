@@ -237,12 +237,15 @@ function cmdRender(cfg: Config, args: string[]) {
   const weeks = Number(argVal(args, "--weeks") ?? cfg.weeks ?? 26);
   const theme = argVal(args, "--theme") ?? cfg.theme ?? "claude";
   const anim = argVal(args, "--anim") ?? "none";
-  const border = !args.includes("--hide-border");
+  // default: no border, square corners (opt in with --border / --rounded;
+  // --hide-border kept as a no-op alias since border is now off by default)
+  const border = args.includes("--border");
+  const rounded = args.includes("--rounded");
   const res = scan({ pricing: cfg.pricing });
   const svg = renderSVG(
     res.days,
     { totalTokens: res.totalTokens, totalCost: res.totalCost, streak: currentStreak(res.days) },
-    { weeks, metric, theme, anim, border, title: cfg.user ? `${cfg.user} · coding heatmap` : "Coding heatmap" }
+    { weeks, metric, theme, anim, border, rounded, title: cfg.user ? `${cfg.user} · coding heatmap` : "Coding heatmap" }
   );
   writeFileSync(out, svg);
   console.log(`wrote ${out}  (${metric}, ${weeks}w, ${theme})`);
@@ -587,7 +590,7 @@ function help() {
 Usage:
   ccmap scan                       Summarize local usage (no upload)
   ccmap render [--out f.svg]       Render a heatmap SVG locally
-                [--metric tokens|cost] [--weeks 26] [--hide-border]
+                [--metric tokens|cost] [--weeks 26] [--border] [--rounded]
                 [--theme claude|github-dark|github-light|tokyo-night|dracula|nord]
                 [--anim none|ember|wave|cascade]
   ccmap report [--out f.html]      Render a full shareable HTML report locally
