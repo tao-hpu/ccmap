@@ -8,27 +8,33 @@ README or post.
 > **Privacy:** only per-day token/cost counts and model names ever leave your
 > machine. Never your prompts, code, or project names.
 
-## Quick start (local, no server)
+## Install
 
 ```bash
-# from anywhere, once published to npm:
-npx ccmap scan                 # summarize usage in the terminal
-npx ccmap render --out me.svg  # render a heatmap you can open / commit
-
-# or in this repo:
-pnpm install && pnpm build
-node dist/cli.js scan
+npm i -g ccmap
 ```
+
+That's the whole install. Then:
+
+```bash
+ccmap scan      # see your usage in the terminal — colored heatmap, no upload, no setup
+ccmap push      # claim a name + publish your badge → <host>/u/<you>.svg
+ccmap start     # keep it fresh: push every 15 min in the background
+```
+
+Don't want to install? `npx ccmap@latest scan` runs it once, always latest.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `ccmap scan` | Summarize local usage (tokens, est. cost, streak, model mix). No upload. |
-| `ccmap render [--out f.svg] [--metric tokens\|cost] [--weeks 26] [--theme dark\|light]` | Render a heatmap SVG locally. |
-| `ccmap config --user <name> --endpoint <url> [--token <t>] [--interval 15]` | Save push settings to `~/.ccmap/config.json`. |
-| `ccmap push` | Push aggregates to your endpoint once. |
-| `ccmap start` | Resident: push every `interval` minutes. |
+| `ccmap scan` | Summarize local usage (tokens, est. cost, streak, model mix) + terminal heatmap. No upload. |
+| `ccmap render [--out f.svg] [--theme …] [--anim ember\|wave\|cascade] [--metric tokens\|cost] [--weeks 26]` | Render a heatmap SVG locally. |
+| `ccmap report [--out f.html]` | Render a full shareable HTML report (with a live customizer). |
+| `ccmap push` | Publish your data. First run auto-claims a username — no manual setup. |
+| `ccmap start` | Resident: push every `interval` minutes (also checks for updates daily). |
+| `ccmap login --user <name> --endpoint <url>` | Optional: pick a specific username / point at your own server. |
+| `ccmap update` | Self-update to the latest published version. |
 
 ## Data sources
 
@@ -44,12 +50,10 @@ in `~/.ccmap/config.json`:
 { "pricing": { "claude-opus": { "in": 15, "out": 75, "cw": 18.75, "cr": 1.5 } } }
 ```
 
-## Install & update
+## Updating
 
 ```bash
-npx ccmap@latest scan     # zero-install, always latest
-npm i -g ccmap            # install the `ccmap` command
-ccmap update              # self-update to latest (or `npm i -g ccmap@latest`)
+ccmap update     # self-update to latest (same as `npm i -g ccmap@latest`)
 ```
 
 The resident daemon (`ccmap start`) checks npm once a day and prints when a new
