@@ -33,6 +33,7 @@ export interface ReportOptions {
   theme?: string;
   origin?: string; // public base URL, for OG tags / badge embed
   share?: boolean; // include the "Customize & share" embed section (hosted report only)
+  weeks?: number; // heatmap span for the portrait card (26 or 53; default 26)
 }
 
 function fmt(n: number): string {
@@ -51,6 +52,12 @@ function rgbOf(hex: string): string {
 
 const GITHUB = "https://github.com/tao-hpu/ccmap";
 const THEME_NAMES = ["claude", "claude-light", "github-dark", "github-light", "tokyo-night", "dracula", "nord"];
+
+// Inline SVG icons (replace emoji so they render crisply & consistently everywhere).
+const IC_BOLT = `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>`;
+const IC_ARROW = `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>`;
+const IC_ROCKET = `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M15 9h5s-.55 3.03-2 4c-1.62 1.08-5 0-5 0"/></svg>`;
+const IC_GITHUB = `<svg class="ic ic-fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.78 0 12.29c0 5.21 3.44 9.63 8.21 11.19.6.11.82-.25.82-.56v-2.1c-3.34.71-4.04-1.58-4.04-1.58-.55-1.36-1.33-1.72-1.33-1.72-1.09-.73.08-.72.08-.72 1.2.08 1.84 1.21 1.84 1.21 1.07 1.79 2.81 1.27 3.5.97.11-.76.42-1.27.76-1.56-2.67-.3-5.47-1.31-5.47-5.83 0-1.29.47-2.34 1.24-3.17-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.21.96-.26 1.98-.39 3-.4 1.02.01 2.04.14 3 .4 2.29-1.53 3.3-1.21 3.3-1.21.66 1.66.24 2.88.12 3.18.77.83 1.24 1.88 1.24 3.17 0 4.53-2.8 5.53-5.48 5.82.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.57C20.56 21.91 24 17.49 24 12.29 24 5.78 18.63.5 12 .5z"/></svg>`;
 
 // Vanilla client JS for the live customizer. Plain string (no template literals /
 // ${ } inside) so it survives being embedded in the outer template literal.
@@ -71,7 +78,7 @@ function build(){
   var hasQ=(t!=='claude');
   var report=BASE+'/u/'+USER+(hasQ?'?theme='+t:'')+(hasQ?'&':'?')+'v='+cb;
   if($('cb-note'))$('cb-note').textContent='?v='+cb;
-  if($('dl'))$('dl').href=BASE+'/u/'+USER+'.png?shape=portrait'+(t!=='claude'?'&theme='+t:'')+'&v='+cb;
+  if($('dl'))$('dl').href=BASE+'/u/'+USER+'.png?shape=portrait'+(t!=='claude'?'&theme='+t:'')+'&weeks='+w+'&v='+cb;
   $('preview').src=svg;
   var dark=(t==='claude-light')?'claude':t;
   var light=(t==='claude'||t==='claude-light')?'claude-light':'github-light';
@@ -136,7 +143,7 @@ function shareCard(base: string, user: string): string {
       <label class="cb"><input type="checkbox" id="hb" oninput="build()"> hide border</label>
     </div>
     <img id="preview" class="preview" alt="badge preview">
-    <div class="snip"><div class="snip-h"><span>GitHub README · adaptive light/dark ★</span><button onclick="copy('s-pic',this)">copy</button></div><pre><code id="s-pic"></code></pre><div class="note">Follows the viewer's GitHub theme automatically — dark side uses your selected theme above.</div></div>
+    <div class="snip"><div class="snip-h"><span>GitHub README · adaptive light/dark</span><button onclick="copy('s-pic',this)">copy</button></div><pre><code id="s-pic"></code></pre><div class="note">Follows the viewer's GitHub theme automatically — dark side uses your selected theme above.</div></div>
     <div class="snip"><div class="snip-h"><span>Simple markdown (any host)</span><button onclick="copy('s-md',this)">copy</button></div><pre><code id="s-md"></code></pre></div>
     <div class="snip"><div class="snip-h"><span>Share link (X / anywhere)</span><button onclick="copy('s-url',this)">copy</button></div><pre><code id="s-url"></code></pre>
       <div class="share-actions">
@@ -360,7 +367,7 @@ function rankCard(tokens: number, c: ReturnType<typeof resolveTheme>): string {
     ? `<div class="rk-track"><div class="rk-fill" style="width:${prog.toFixed(0)}%"></div></div>
        <div class="rk-scale"><span>${fmt(tier.min)}</span><span>${prog.toFixed(0)}% through this tier</span><span>${fmt(next.min)}</span></div>
        <div class="rk-next"><b>${fmt(next.min - tokens)}</b> more tokens → <b>${esc(next.title)}</b> (unlocks at ${fmt(next.min)})</div>`
-    : `<div class="rk-next">top tier — you've hit ${fmt(tier.min)}+ tokens and ascended 🛸</div>`;
+    : `<div class="rk-next">top tier — you've hit ${fmt(tier.min)}+ tokens and ascended</div>`;
   const ladder = `<div class="rk-ladder">${TIERS.map((t, i) => {
     const cls = i === idx ? "cur" : i < idx ? "done" : "";
     const tip = i < idx ? "unlocked" : i === idx ? "you are here" : `${fmt(t.min - tokens)} tokens to go`;
@@ -471,9 +478,12 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
       if (fill) mascot += `<rect x="${ox + x * px}" y="${oy + y * px}" width="${px}" height="${px}" fill="${fill}"/>`;
     }
 
-  // heatmap, centered
-  const weeks = 53, gcell = 14, ggap = 3, gstep = gcell + ggap;
-  const gw = weeks * gstep, gx = (W - gw) / 2, gy = 905;
+  // heatmap, centered — honors the customizer's week selector (default 26).
+  // Cell size adapts so 26w (chunky recent strip) and 53w (full year) both fill
+  // the width; the grid's bottom edge is anchored so the layout below is stable.
+  const weeks = opts.weeks === 53 ? 53 : 26;
+  const ggap = 3, gstep = Math.min(22, Math.floor(880 / weeks)), gcell = gstep - ggap;
+  const gh = 7 * gstep, gw = weeks * gstep, gx = (W - gw) / 2, gy = 1040 - gh;
   const byDate = new Map<string, number>(d.days.map((x) => [x.date, x.tokens]));
   const vals = d.days.map((x) => x.tokens).filter((v) => v > 0).sort((a, b) => a - b);
   const q = (p: number) => (vals.length ? vals[Math.min(vals.length - 1, Math.floor(p * vals.length))] : 0);
@@ -500,7 +510,7 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
   // QR linking back to this page — scan it to open the live report.
   const base = (opts.origin || "https://ccmap.fim.ai").replace(/\/$/, "");
   const pageUrl = `${base}/u/${encodeURIComponent(user)}`;
-  const qs = 150, qx = (W - qs) / 2, qy = 1132;
+  const qs = 140, qx = (W - qs) / 2, qy = 1142;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${font}" xml:space="preserve">
   <rect width="${W}" height="${H}" fill="${c.bg}"/>
@@ -514,10 +524,10 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
   <text x="${cx}" y="812" text-anchor="middle" font-size="58" font-weight="700" fill="${c.scale[2]}">${fmt(d.totals.tokens)} tokens</text>
   <text x="${cx}" y="862" text-anchor="middle" font-size="28" fill="${c.sub}">${sub}</text>
   <g>${grid}</g>
-  <text x="${cx}" y="1058" text-anchor="middle" font-size="26" fill="${c.sub}">${goal}</text>
-  <text x="${cx}" y="1108" text-anchor="middle" font-size="32" font-weight="700" fill="${c.text}">Get your own coding heatmap</text>
+  <text x="${cx}" y="1078" text-anchor="middle" font-size="26" fill="${c.sub}">${goal}</text>
+  <text x="${cx}" y="1120" text-anchor="middle" font-size="32" font-weight="700" fill="${c.text}">Get your own coding heatmap</text>
   ${qrChip(pageUrl, qx, qy, qs)}
-  <text x="${cx}" y="1322" text-anchor="middle" font-size="23" fill="${c.scale[2]}">scan to open · npm i -g @tao-hpu/ccmap</text>
+  <text x="${cx}" y="1312" text-anchor="middle" font-size="23" fill="${c.scale[2]}">scan to open · npm i -g @tao-hpu/ccmap</text>
 </svg>`;
 }
 
@@ -685,12 +695,20 @@ ${ogTags}
   .cta-h{font-size:25px;font-weight:800}
   .cta-sub{font-size:14px;color:var(--sub);margin:7px 0 18px}
   .cta-row{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap}
-  .cta-btn{display:inline-flex;align-items:center;justify-content:center;height:48px;padding:0 26px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;border:1.5px solid transparent;border-radius:11px;text-decoration:none;transition:filter .12s}
+  .cta-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;height:48px;padding:0 26px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;border:1.5px solid transparent;border-radius:11px;text-decoration:none;transition:filter .12s}
   .cta-btn:hover{filter:brightness(1.06)}
   .cta-code{display:inline-flex;align-items:center;height:48px;font:13px ui-monospace,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:0 16px;color:var(--fg)}
   .getyours{position:fixed;right:18px;bottom:18px;z-index:50;display:inline-flex;align-items:center;gap:7px;padding:12px 19px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;border-radius:999px;text-decoration:none;border:1px solid rgba(0,0,0,.15)}
   .getyours:hover{filter:brightness(1.06)}
+  .getyours .ic{width:16px;height:16px}
   @media(max-width:560px){.getyours{right:10px;bottom:10px;padding:10px 15px;font-size:13px}}
+  .ic{width:1.05em;height:1.05em;vertical-align:-.16em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .ic-fill{fill:currentColor;stroke:none}
+  .cta-h .ic{width:.9em;height:.9em;vertical-align:-.06em;margin-left:6px}
+  .cta-copy{display:inline-flex;align-items:center;height:48px;background:var(--bg);border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .cta-copy code{padding:0 14px;white-space:nowrap}
+  .cta-copy button{align-self:stretch;border:none;border-left:1px solid var(--line);background:transparent;color:var(--accent);font:13px inherit;font-weight:700;padding:0 16px;cursor:pointer;transition:background .12s}
+  .cta-copy button:hover{background:rgba(var(--accent-rgb),.1)}
   pre{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
   pre::-webkit-scrollbar{height:8px}
   pre::-webkit-scrollbar-track{background:transparent;border-radius:8px}
@@ -739,11 +757,11 @@ ${ogTags}
   ${opts.share ? shareCard(opts.origin || "https://YOUR-CCMAP-HOST", user) : ""}
 
   ${opts.share ? `<div class="cta">
-    <div class="cta-h">Want your own? 🚀</div>
+    <div class="cta-h">Want your own?${IC_ROCKET}</div>
     <div class="cta-sub">A GitHub-style heatmap of your Claude Code + Codex usage — free, 100% local, set up in 30 seconds.</div>
     <div class="cta-row">
-      <a class="cta-btn" href="${GITHUB}" target="_blank" rel="noopener">★ Get it on GitHub →</a>
-      <code class="cta-code">npm i -g @tao-hpu/ccmap</code>
+      <a class="cta-btn" href="${GITHUB}" target="_blank" rel="noopener">${IC_GITHUB}Get it on GitHub</a>
+      <div class="cta-copy"><code id="cta-cmd">npm i -g @tao-hpu/ccmap</code><button onclick="copy('cta-cmd',this)">copy</button></div>
     </div>
   </div>` : ""}
 
@@ -753,7 +771,7 @@ ${ogTags}
     badge ? ` · <a href="${badge}">badge</a>` : ""
   }</footer>
 </div>
-${opts.share ? `<a class="getyours" href="${GITHUB}" target="_blank" rel="noopener">⚡ Get your own ↗</a>` : ""}
+${opts.share ? `<a class="getyours" href="${GITHUB}" target="_blank" rel="noopener">${IC_BOLT}Get your own${IC_ARROW}</a>` : ""}
 <script>${opts.share ? `const BASE=${JSON.stringify(opts.origin || "https://YOUR-CCMAP-HOST")},USER=${JSON.stringify(user)};${SHARE_JS}` : ""}${TOOLTIP_JS}</script>
 </body></html>`;
 }

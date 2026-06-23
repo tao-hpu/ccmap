@@ -4,6 +4,20 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.9] — 2026-06-23
+
+### Changed
+- **Portrait/download card now defaults to 26 weeks** (a chunkier, fuller "recent
+  half-year" strip) and honors the customizer's week selector — the download link
+  passes `&weeks=`, so what you pick is what you get. The wide X/OG card stays
+  full-year (it fills the landscape strip edge-to-edge).
+- **Emoji → inline SVG icons.** The CTA rocket and the sticky "Get your own"
+  lightning/arrow are now crisp SVG icons (plus a GitHub mark on the CTA button)
+  instead of emoji, for consistent rendering across platforms.
+
+### Added
+- A **copy button** on the `npm i -g @tao-hpu/ccmap` command in the CTA.
+
 ## [0.1.8] — 2026-06-23
 
 ### Added
@@ -129,6 +143,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.1.9]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.9
 [0.1.8]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.8
 [0.1.7]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.7
 [0.1.6]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.6

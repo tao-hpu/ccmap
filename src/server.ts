@@ -241,7 +241,7 @@ async function handlePng(req: IncomingMessage, user: string, url: URL, res: Serv
   // default → the wide tier-mascot OG card.
   const svg =
     url.searchParams.get("shape") === "portrait"
-      ? renderPortraitCard(data, { theme, origin: originOf(req, url) })
+      ? renderPortraitCard(data, { theme, origin: originOf(req, url), weeks: url.searchParams.get("weeks") === "53" ? 53 : 26 })
       : url.searchParams.get("card") === "badge"
         ? renderSVG(
             daysToMap(p),
