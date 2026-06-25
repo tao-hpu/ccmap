@@ -4,9 +4,8 @@ Coding heatmap for **Claude Code + Codex**. Scans your local CLI logs and render
 GitHub-style contribution heatmap — in your terminal, as a local SVG/HTML report, or
 published to a public **report page** (`https://.../u/<you>`) with an embeddable badge.
 
-> **Privacy:** only per-day token/cost counts, model names, and — if you opt in
-> with `config --plan` — your plan name ever leave your machine. Never your
-> prompts, code, or project names.
+> **Privacy:** only per-day token/cost counts and model names ever leave your
+> machine. Never your prompts, code, or project names.
 
 ## Install
 
@@ -51,7 +50,7 @@ Don't want to install? `npx @tao-hpu/ccmap@latest scan` runs it once, always lat
 
 | Command | What it does |
 | --- | --- |
-| `ccmap config [--interval <min>] [--metric tokens\|cost] [--theme …] [--weeks 26] [--plan <id>]` | View / update saved settings in `~/.ccmap/config.json`. `--plan` records your subscription (e.g. `claude-max-20`) so the report shows **amplifier power**. |
+| `ccmap config [--interval <min>] [--metric tokens\|cost] [--theme …] [--weeks 26]` | View / update saved settings in `~/.ccmap/config.json`. |
 | `ccmap update` | Self-update to the latest published version. |
 | `ccmap version` · `ccmap help` | Print version / usage. |
 | `ccmap login --user <name> --endpoint <url> [--invite <code>]` | **Optional / advanced.** Only needed to claim a *specific* username or point at a self-hosted server — plain `push` already auto-claims against the default service. |
@@ -91,19 +90,6 @@ tiers Claude reports are all priced separately. Override any model in
 ```json
 { "pricing": { "claude-opus": { "in": 5, "out": 25, "cw": 6.25, "cr": 0.5, "cw1h": 10 } } }
 ```
-
-## Amplifier power
-
-Your Claude Max / ChatGPT plan is a flat monthly fee, but your actual usage has a
-metered-API value. Tell ccmap your plan and the report shows the ratio:
-
-```bash
-ccmap config --plan claude-max-20   # claude-pro | claude-max-5 | claude-max-20 | codex-plus | codex-pro | codex-business
-```
-
-The report then renders an **Amplifier power** card — what you pay vs. what the same
-usage would cost at API rates, the multiplier, monthly + lifetime savings, and a
-comparison across plans. Override list prices with `"planPrices": { "claude-max-20": 200 }`.
 
 ## Updating
 

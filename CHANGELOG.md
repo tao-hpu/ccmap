@@ -4,6 +4,16 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.16] — 2026-06-25
+
+### Removed
+- **Amplifier power** (shipped in 0.1.15) — reverted. A subscription tier/price
+  can't be reliably detected from local logs, so the feature only worked with
+  manual `config --plan` input, which undercut its value. Removed the report card,
+  the `config --plan` option, and the `plans`/`planPrices` config fields. **The
+  0.1.15 pricing corrections are retained** (Opus → $5/$25, Haiku → $1/$5, Fable 5
+  $10/$50, and the 5-min/1-hour cache-write split).
+
 ## [0.1.15] — 2026-06-25
 
 ### Fixed

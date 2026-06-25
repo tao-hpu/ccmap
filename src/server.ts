@@ -18,7 +18,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderSVG, resolveTheme } from "./render.js";
 import { renderReport, renderSocialCard, renderPortraitCard } from "./report.js";
-import type { Amplifier } from "./plans.js";
 
 const PORT = Number(process.env.PORT || 3006);
 const DATA = process.env.CCMAP_DATA || "./ccmap-data.json";
@@ -42,7 +41,6 @@ interface PushPayload {
   totals: { tokens: number; cost: number; streak: number; bySource: { claude: number; codex: number } };
   byModel: Record<string, number>;
   days: PushDay[];
-  amplifier?: Amplifier; // present only if the user explicitly set a plan
 }
 
 // ---- storage: a flat key->string map, persisted atomically to one JSON file ----
@@ -285,7 +283,7 @@ function handleReport(req: IncomingMessage, user: string, url: URL, res: ServerR
   const p = JSON.parse(raw) as PushPayload;
   const theme = url.searchParams.get("theme") || "claude";
   const html = renderReport(
-    { user, totals: p.totals, byModel: p.byModel, days: p.days, amplifier: p.amplifier },
+    { user, totals: p.totals, byModel: p.byModel, days: p.days },
     { theme, origin: originOf(req, url), share: true, cacheBust: url.searchParams.get("v") || undefined }
   );
   send(res, 200, html, { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300" });

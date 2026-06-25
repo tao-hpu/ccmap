@@ -9,7 +9,6 @@ import { dirname, join } from "node:path";
 import { scan, currentStreak, type ScanResult } from "./parse.js";
 import { renderSVG, resolveTheme } from "./render.js";
 import { renderReport } from "./report.js";
-import { resolvePlans, computeAmplifier, planById, PLANS, type Amplifier } from "./plans.js";
 import type { DayStat } from "./parse.js";
 import { loadConfig, saveConfig, CONFIG_PATH, type Config } from "./config.js";
 import { ROLLUP_PATH } from "./rollup.js";
@@ -132,11 +131,6 @@ function buildPayload(res: ScanResult, cfg: Config) {
       codex: d.bySource.codex,
       sessions: d.sessions.size,
     }));
-  // Only attach the amplifier when a plan is *explicitly* set — never the assumed
-  // default — so a user who never ran `config --plan` doesn't get a plan shown on
-  // their public report page.
-  const amplifier =
-    cfg.plans && cfg.plans.length ? amplifierFor(res, cfg) ?? undefined : undefined;
   return {
     v: VERSION,
     user: cfg.user,
@@ -149,18 +143,11 @@ function buildPayload(res: ScanResult, cfg: Config) {
     },
     byModel: res.byModel, // tokens per model (no content, no project names)
     days,
-    amplifier,
   };
 }
 
 function pct(part: number, total: number) {
   return total ? ((part / total) * 100).toFixed(0) + "%" : "0%";
-}
-
-function amplifierFor(res: ScanResult, cfg: Config): Amplifier | null {
-  const sel = resolvePlans(cfg.plans, cfg.planPrices, res.bySource.claude > 0, res.bySource.codex > 0);
-  const days = [...res.days.values()].map((d) => ({ date: d.date, cost: d.cost }));
-  return computeAmplifier(days, res.totalCost, res.firstDay, res.lastDay, sel);
 }
 
 function hexRgb(h: string): [number, number, number] {
@@ -234,19 +221,6 @@ function cmdScan(cfg: Config) {
   console.log(`  models:`);
   for (const [m, v] of top) console.log(`    ${m.padEnd(28)} ${pct(v, res.totalTokens).padStart(4)}  ${v.toLocaleString()}`);
 
-  const amp = amplifierFor(res, cfg);
-  if (amp) {
-    const planNames = amp.plans.map((p) => p.name).join(" + ");
-    const x = amp.amplifier >= 10 ? Math.round(amp.amplifier) : amp.amplifier.toFixed(1);
-    console.log(
-      `  plan:     ${planNames}  $${amp.monthlyCost}/mo${amp.assumed ? "  (assumed — set with: ccmap config --plan <id>)" : ""}`
-    );
-    console.log(
-      `  amplify:  ${x}× — ${amp.basis} usage ≈ $${Math.round(amp.headlineValue).toLocaleString()} of API value` +
-        (amp.savedPerMonth > 0 ? `, ~$${Math.round(amp.savedPerMonth).toLocaleString()}/mo saved` : "")
-    );
-  }
-
   // graphical render (only on an interactive terminal, unless --no-graph)
   if (process.stdout.isTTY && !process.argv.includes("--no-graph")) {
     const theme = cfg.theme ?? "claude";
@@ -306,11 +280,7 @@ function cmdReport(cfg: Config, args: string[]) {
   const theme = argVal(args, "--theme") ?? cfg.theme ?? "claude";
   const res = scan({ pricing: cfg.pricing, rollupPath: ROLLUP_PATH });
   const payload = buildPayload(res, cfg);
-  const amplifier = amplifierFor(res, cfg) ?? undefined;
-  const html = renderReport(
-    { user: cfg.user, totals: payload.totals, byModel: payload.byModel, days: payload.days, amplifier },
-    { theme, origin: cfg.endpoint }
-  );
+  const html = renderReport({ user: cfg.user, totals: payload.totals, byModel: payload.byModel, days: payload.days }, { theme, origin: cfg.endpoint });
   writeFileSync(out, html);
   console.log(`wrote ${out}  (open in a browser)`);
 }
@@ -624,18 +594,6 @@ function cmdConfig(args: string[]) {
     cfg.weeks = Number(wk);
     changed = true;
   }
-  const pl = argVal(args, "--plan");
-  if (pl !== undefined) {
-    const ids = pl.split(",").map((s) => s.trim()).filter(Boolean);
-    const unknown = ids.filter((id) => !planById(id));
-    if (unknown.length) {
-      console.error(`unknown plan id(s): ${unknown.join(", ")}`);
-      console.error(`valid ids: ${PLANS.map((p) => `${p.id} ($${p.monthly}/mo)`).join(", ")}`);
-      process.exit(1);
-    }
-    cfg.plans = ids;
-    changed = true;
-  }
   if (changed) {
     saveConfig(cfg);
     console.log(`saved ${CONFIG_PATH}`);
@@ -669,15 +627,12 @@ Usage:
   ccmap stop                       Remove the scheduled job
   ccmap status                     Show schedule + last push
   ccmap config [--interval <min>] [--metric tokens|cost] [--theme dark|light]
-                [--plan <id[,id]>] (claude-pro|claude-max-5|claude-max-20|codex-plus|codex-pro|codex-business)
                                    (--interval is minutes between scheduled pushes; default 1440 = daily)
-                                   (--plan sets your subscription so the report shows amplifier power)
   ccmap update                     Self-update to the latest published version
   ccmap version
 
-Privacy: only per-day token/cost counts, model names, and (if you set one) your
-plan name leave your machine on push. Never your prompts, code, or project names.
-Config: ${CONFIG_PATH}`);
+Privacy: only per-day token/cost counts and model names leave your machine.
+Never your prompts, code, or project names. Config: ${CONFIG_PATH}`);
 }
 
 async function main() {

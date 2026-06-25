@@ -13,8 +13,6 @@ export interface Config {
   weeks?: number;
   theme?: string; // named theme, see src/render.ts THEMES
   pricing?: Record<string, Price>; // model -> price override
-  plans?: string[]; // active subscription plan ids (see src/plans.ts PLANS)
-  planPrices?: Record<string, number>; // monthly USD override per plan id
 }
 
 export const CONFIG_DIR = join(homedir(), ".ccmap");
