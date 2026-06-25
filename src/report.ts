@@ -1,5 +1,6 @@
 import { renderSVG, resolveTheme } from "./render.js";
 import { qrMatrix } from "./qr.js";
+import { PLANS, type Amplifier } from "./plans.js";
 
 // Render a URL as a self-contained "scan me" SVG chip: a light rounded card
 // (QR must be dark-on-light to scan reliably) with the QR drawn as <rect>s.
@@ -26,6 +27,7 @@ export interface ReportData {
   totals: { tokens: number; cost: number; streak: number; bySource: { claude: number; codex: number } };
   byModel: Record<string, number>;
   days: { date: string; tokens: number; cost: number; claude: number; codex: number }[];
+  amplifier?: Amplifier; // plan value vs metered-API cost; omitted on hosted reports
 }
 
 export interface ReportOptions {
@@ -569,6 +571,61 @@ function bars(items: [string, number][], total: number, c: ReturnType<typeof res
     .join("");
 }
 
+function money(n: number): string {
+  return "$" + Math.round(n).toLocaleString();
+}
+function xfmt(n: number): string {
+  return (n >= 10 ? Math.round(n) : n.toFixed(1)) + "×";
+}
+
+// "Amplifier power": how much metered-API value a flat monthly plan returns.
+function amplifierCard(a: Amplifier): string {
+  const good = a.savedPerMonth > 0;
+  const planNames = a.plans.map((p) => esc(p.name)).join(" + ");
+  // comparison across every plan for the provider(s) in use, current one tagged
+  const providers = new Set(a.plans.map((p) => p.provider));
+  const selectedIds = new Set(a.plans.map((p) => p.id));
+  const rows = PLANS.filter((p) => providers.has(p.provider))
+    .map((p) => {
+      const mult = p.monthly ? a.headlineValue / p.monthly : 0;
+      const cur = selectedIds.has(p.id);
+      return `<tr class="${cur ? "amp-cur" : ""}"><td>${esc(p.name)}${
+        cur ? ' <span class="amp-tag">you</span>' : ""
+      }</td><td class="amp-r">${money(p.monthly)}/mo</td><td class="amp-r">${xfmt(mult)}</td></tr>`;
+    })
+    .join("");
+  // paid-vs-value bar (paid as a fraction of the larger of the two)
+  const span = Math.max(a.headlineValue, a.monthlyCost, 1);
+  const paidPct = ((a.monthlyCost / span) * 100).toFixed(1);
+  const note = a.assumed
+    ? ` <span class="amp-hint">(assumed — set yours with <code>ccmap config --plan</code>)</span>`
+    : "";
+  const saveLine = good
+    ? `<p class="amp-save">≈ <b>${money(a.savedPerMonth)}/mo</b> saved · about <b>${money(
+        a.lifetimeSaved
+      )}</b> over ${Math.round(a.monthsElapsed)} months on the plan.</p>`
+    : `<p class="amp-save">Usage this period sits below the plan price — light month, or room to lean on it more.</p>`;
+  return `<div class="card amp"><h2>Amplifier power</h2>
+    <div class="amp-top">
+      <div class="amp-x"><div class="amp-xn">${xfmt(a.amplifier)}</div><div class="amp-xc">return on spend</div></div>
+      <div class="amp-say">
+        <div class="amp-head">${
+          good ? "You're getting far more than you pay for." : "Below plan price this period."
+        }</div>
+        <p>Your <b>${planNames}</b> plan costs <b>${money(a.monthlyCost)}/mo</b>. The same usage (${esc(
+          a.basis
+        )}) would cost <b>${money(a.headlineValue)}</b> at metered API rates.${note}</p>
+        ${saveLine}
+      </div>
+    </div>
+    <div class="amp-bar"><div class="amp-paid" style="width:${paidPct}%"></div></div>
+    <div class="amp-blbl"><span>plan ${money(a.monthlyCost)}/mo</span><span>API value ${money(
+      a.headlineValue
+    )}</span></div>
+    <table class="amp-tbl"><thead><tr><th>plan</th><th class="amp-r">price</th><th class="amp-r">amplifier at your usage</th></tr></thead><tbody>${rows}</tbody></table>
+  </div>`;
+}
+
 export function renderReport(d: ReportData, opts: ReportOptions = {}): string {
   const c = resolveTheme(opts.theme ?? "claude");
   const user = d.user ?? "anon";
@@ -669,6 +726,25 @@ ${ogTags}
   .tip.on{opacity:1}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin:18px 0}
   .card h2{font-size:14px;margin:0 0 14px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .amp{background:linear-gradient(180deg,rgba(var(--accent-rgb),.10),var(--card))}
+  .amp-top{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+  .amp-x{flex:none;min-width:128px;text-align:center;padding:14px 18px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+  .amp-xn{font-size:44px;font-weight:800;line-height:1;color:var(--accent)}
+  .amp-xc{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
+  .amp-say{flex:1;min-width:240px}
+  .amp-head{font-size:18px;font-weight:700;margin-bottom:4px}
+  .amp-say p{margin:4px 0;font-size:13.5px;color:var(--fg)}
+  .amp-save{color:var(--accent)!important}
+  .amp-hint{color:var(--sub);font-size:12px}
+  .amp-bar{height:12px;border-radius:6px;margin:16px 0 6px;background:rgba(var(--accent-rgb),.85);overflow:hidden;position:relative}
+  .amp-paid{height:100%;background:var(--sub);opacity:.55}
+  .amp-blbl{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums}
+  .amp-tbl{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}
+  .amp-tbl th{text-align:left;font-size:11px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--line)}
+  .amp-tbl td{padding:7px 8px;border-bottom:1px solid var(--line)}
+  .amp-tbl .amp-r{text-align:right;font-variant-numeric:tabular-nums}
+  .amp-tbl tr.amp-cur td{background:rgba(var(--accent-rgb),.10);font-weight:600}
+  .amp-tag{font-size:10px;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:1px 5px;margin-left:6px;vertical-align:1px}
   /* collapsible "Customize & share" — folded by default */
   .fold{padding:0;overflow:hidden}
   .fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:16px 18px;font-size:14px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;-webkit-tap-highlight-color:transparent}
@@ -783,6 +859,8 @@ ${ogTags}
     ${peak ? stat("busiest day", fmt(peak.tokens), "peak") : ""}
     ${stat("7-day trend", trendStr, "trend")}
   </div>
+
+  ${d.amplifier ? amplifierCard(d.amplifier) : ""}
 
   <div class="card"><h2>Activity</h2>${heat}</div>
 

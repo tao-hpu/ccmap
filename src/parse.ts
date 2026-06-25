@@ -146,13 +146,20 @@ export function scan(opts: ScanOptions = {}): ScanResult {
         if (key !== ":" && seen.has(key)) continue;
         if (key !== ":") seen.add(key);
         const model = msg.model ?? "unknown";
+        // Cache writes come in two tiers: 5-minute (1.25x input) and 1-hour (2x input).
+        // The usage record breaks them out under cache_creation; fall back to all-5m.
+        const cc = u.cache_creation || {};
+        const totalCw = u.cache_creation_input_tokens || 0;
+        const cw1h = cc.ephemeral_1h_input_tokens || 0;
+        const cw5m = cc.ephemeral_5m_input_tokens != null ? cc.ephemeral_5m_input_tokens : totalCw - cw1h;
         const t = {
           input: u.input_tokens || 0,
           output: u.output_tokens || 0,
-          cacheWrite: u.cache_creation_input_tokens || 0,
+          cacheWrite: cw5m,
+          cacheWrite1h: cw1h,
           cacheRead: u.cache_read_input_tokens || 0,
         };
-        const tokens = t.input + t.output + t.cacheWrite + t.cacheRead;
+        const tokens = t.input + t.output + t.cacheWrite + t.cacheWrite1h + t.cacheRead;
         if (tokens === 0) continue;
         const cost = costOf(model, t, opts.pricing);
         add(days, localDate(o.timestamp), "claude", model, tokens, cost, o.sessionId ?? "");
@@ -197,6 +204,7 @@ export function scan(opts: ScanOptions = {}): ScanResult {
           input: Math.max(0, (last.input_tokens || 0) - cached),
           output: last.output_tokens || 0,
           cacheWrite: 0,
+          cacheWrite1h: 0,
           cacheRead: cached,
         };
         const tokens = (last.total_tokens as number) || t.input + t.output + cached;

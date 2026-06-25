@@ -4,6 +4,29 @@ All notable changes to **ccmap** are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions track the npm
 package version (each release is tagged `vX.Y.Z` in git).
 
+## [0.1.15] — 2026-06-25
+
+### Fixed
+- **Cost estimate was significantly off for Claude.** The price table used legacy
+  Opus rates (`$15/$75` per 1M) — current Opus 4.5–4.8 is `$5/$25`, so all Opus
+  usage was billed **3× too high**. Haiku was on old 3.5 rates (`$0.80/$4` → `$1/$5`),
+  and **Claude Fable 5 was missing entirely**, silently falling back to Sonnet rates
+  instead of its actual `$10/$50`. All corrected.
+- **Cache-write tier was mispriced.** Claude reports two cache-write TTLs — 5-minute
+  (1.25× input) and 1-hour (2× input) — but every write was priced at the 5-minute
+  rate. The parser now reads the `cache_creation.ephemeral_5m/1h` breakdown and
+  prices each tier correctly (new `cw1h` field in the price table).
+
+### Added
+- **Amplifier power.** Tell ccmap your subscription with `ccmap config --plan <id>`
+  (`claude-pro`, `claude-max-5`, `claude-max-20`, `codex-plus`, `codex-pro`,
+  `codex-business`) and the report shows how much metered-API value your flat plan
+  returns — the multiplier, monthly + lifetime savings, and a comparison across
+  plans at your usage. Surfaces in both `ccmap scan` (terminal) and the report page.
+- The amplifier appears on the hosted/pushed report too, but **only when a plan is
+  explicitly set** — never the assumed local default — so plan info never leaves
+  your machine unless you opt in.
+
 ## [0.1.14] — 2026-06-23
 
 ### Fixed
