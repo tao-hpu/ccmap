@@ -78,3 +78,12 @@ test("fresh CLI render keeps the Claude call-site default", () => {
   assert.match(svg, /fill="#1f1e1d"/);
   assert.match(svg, /fill="#faf9f5"/);
 });
+
+test("CLI codex shorthand uses the Codex light theme", () => {
+  const home = temporaryHome();
+  const output = join(home, "codex-theme.svg");
+  runCli(home, ["render", "--out", output, "--theme", "codex", "--weeks", "4"]);
+  const svg = readFileSync(output, "utf8");
+  assert.match(svg, /fill="#FFFFFF"/);
+  assert.match(svg, /fill="#191C1F"/);
+});

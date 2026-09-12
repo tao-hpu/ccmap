@@ -139,6 +139,7 @@ test("pre-existing theme records remain byte-for-byte compatible", () => {
 test("aliases, resolver fallback, and Claude report default remain unchanged", () => {
   assert.equal(resolveTheme("dark"), THEMES["github-dark"]);
   assert.equal(resolveTheme("light"), THEMES["github-light"]);
+  assert.equal(resolveTheme("codex"), THEMES["codex-light"]);
   assert.equal(resolveTheme(), THEMES["github-dark"]);
   assert.equal(resolveTheme("no-such-theme"), THEMES["github-dark"]);
 
@@ -151,4 +152,11 @@ test("aliases, resolver fallback, and Claude report default remain unchanged", (
   const report = renderReport(payload);
   assert.match(report, /--bg:#1f1e1d/);
   assert.match(report, /--fg:#faf9f5/);
+});
+
+test("codex shorthand renders the Codex light palette", () => {
+  const days = createThemeDays();
+  const shorthand = renderSVG(days, FIXTURE_TOTALS, { theme: "codex", weeks: 4 });
+  const light = renderSVG(days, FIXTURE_TOTALS, { theme: "codex-light", weeks: 4 });
+  assert.equal(normalizeSvgDates(shorthand), normalizeSvgDates(light));
 });

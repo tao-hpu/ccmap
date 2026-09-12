@@ -91,6 +91,7 @@ const GITHUB = "https://github.com/tao-hpu/ccmap";
 const THEME_NAMES = [
   "claude",
   "claude-light",
+  "codex",
   "codex-dark",
   "codex-light",
   "github-dark",
@@ -128,7 +129,7 @@ function build(){
   if($('cb-note'))$('cb-note').textContent='?v='+cb;
   if($('dl'))$('dl').href=BASE+'/u/'+USER+'.png?shape=portrait'+(t!=='claude'?'&theme='+t:'')+'&weeks='+w+'&v='+cb;
   $('preview').src=svg;
-  var codex=(t==='codex-dark'||t==='codex-light');
+  var codex=(t==='codex'||t==='codex-dark'||t==='codex-light');
   var dark=codex?'codex-dark':((t==='claude-light')?'claude':t);
   var light=codex?'codex-light':((t==='claude'||t==='claude-light')?'claude-light':'github-light');
   setText('s-md','![my coding heatmap]('+svg+')');

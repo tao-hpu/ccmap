@@ -634,7 +634,7 @@ function argVal(args: string[], flag: string): string | undefined {
 }
 
 const THEME_HELP =
-  "claude|claude-light|codex-dark|codex-light|github-dark|github-light|tokyo-night|dracula|nord";
+  "claude|claude-light|codex-dark|codex-light|github-dark|github-light|tokyo-night|dracula|nord|codex";
 
 function help() {
   console.log(`ccmap ${VERSION} — coding heatmap for Claude Code + Codex + Grok

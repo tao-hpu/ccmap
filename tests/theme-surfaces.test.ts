@@ -87,7 +87,7 @@ function assertSharedOptions(value: string, border: boolean, rounded: boolean, o
   assert.equal(value.split("weeks=53").length - 1, occurrences);
 }
 
-for (const theme of ["codex-light", "codex-dark"]) {
+for (const theme of ["codex", "codex-light", "codex-dark"]) {
   for (const border of [false, true]) {
     for (const rounded of [false, true]) {
       test(`customizer propagates ${theme} border=${border ? "true" : "omitted"} rounded=${rounded}`, () => {
@@ -109,8 +109,13 @@ test("report selector lists Codex themes and preserves existing adaptive pairing
     origin: "https://ccmap.example",
     share: true,
   });
+  assert.match(html, /<option>codex<\/option>/);
   assert.match(html, /<option>codex-dark<\/option>/);
   assert.match(html, /<option>codex-light<\/option>/);
+
+  const codex = runCustomizer("codex", false, false).get("s-pic")!.textContent;
+  assert.match(codex, /dark\)" srcset="[^"]*theme=codex-dark&/);
+  assert.match(codex, /light\)" srcset="[^"]*theme=codex-light&/);
 
   const claude = runCustomizer("claude-light", false, false).get("s-pic")!.textContent;
   assert.match(claude, /dark\)" srcset="[^"]*theme=claude&/);

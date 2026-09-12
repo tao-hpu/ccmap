@@ -17,7 +17,6 @@ Thumbs.db
 
 # local package-manager and release helper files
 /.npmignore
-/pnpm-workspace.yaml
 
 # generated local reports and Worker output
 /ccmap-report.html

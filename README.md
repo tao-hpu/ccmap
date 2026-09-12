@@ -91,8 +91,39 @@ and nothing extra leaves your machine.
 Cost is an **estimate** from a built-in per-model price table (USD per 1M tokens:
 `in` input, `out` output, `cw` 5-min cache write, `cr` cache read, `cw1h` 1-hour
 cache write). Defaults track current list prices — current Opus is `$5/$25`, Fable
-5 is `$10/$50`. Cache reads (the dominant cost in agent loops) and the two cache-write
-tiers Claude reports are all priced separately.
+5 is `$10/$50`. GPT/Codex entries track the current OpenAI rates, including
+`gpt-5.3-codex`/`gpt-5.2` at `$1.75/$14` and `gpt-5.5` at `$5/$30` (input/output;
+cached input and cache creation are charged separately). Cache reads (the dominant
+cost in agent loops) and the two cache-write tiers Claude reports are all priced
+separately.
+
+Sources: [OpenAI API pricing](https://developers.openai.com/api/docs/pricing),
+[GPT-5.3-Codex](https://developers.openai.com/api/docs/models/gpt-5.3-codex), and
+[GPT-5.2-Codex](https://developers.openai.com/api/docs/models/gpt-5.2-codex).
+The values below use the Standard short-context API rate; requests over 272K input
+tokens can have higher long-context rates that ccmap does not currently apply.
+
+The built-in Codex model rates, including models retained for historical logs,
+are (USD per 1M tokens):
+
+| Model | Input | Cached input | Cache writes | Output |
+| --- | ---: | ---: | ---: | ---: |
+| `gpt-6-astra` | $10.00 | $1.00 | $12.50 | $50.00 |
+| `gpt-5.6-sol` | $4.00 | $0.40 | $5.00 | $20.00 |
+| `gpt-5.6-terra` | $2.00 | $0.20 | $2.50 | $12.00 |
+| `gpt-5.6-luna` | $0.20 | $0.02 | $0.25 | $1.20 |
+| `gpt-5.5` | $5.00 | $0.50 | - | $30.00 |
+| `gpt-5.4` | $2.50 | $0.25 | - | $15.00 |
+| `gpt-5.4-mini` | $0.75 | $0.075 | - | $4.50 |
+| `gpt-5.3-codex` / `gpt-5.2-codex` / `gpt-5.2` | $1.75 | $0.175 | - | $14.00 |
+| `gpt-5.1` / `gpt-5` | $1.25 | $0.125 | - | $10.00 |
+
+A `-` means the price is unavailable or not applicable and is treated as zero by
+the estimator. Codex logs currently report cache reads only; cache-write prices
+remain available for usage records that provide them.
+
+API-only OpenAI models are intentionally excluded. Add a custom entry under
+`pricing` only when using a separately configured provider in Codex.
 
 Grok is the exception: its CLI records what it actually billed for each turn, so
 ccmap uses that number instead of estimating. It accounts for backend search and
@@ -144,7 +175,7 @@ Grab the badge SVG from there, or embed it directly (GitHub renders SVG natively
 
 | param | values | default |
 | --- | --- | --- |
-| `theme` | `claude` `claude-light` `codex-dark` `codex-light` `github-dark` `github-light` `tokyo-night` `dracula` `nord` (`dark`/`light` aliases) | `claude` |
+| `theme` | `claude` `claude-light` `codex` `codex-dark` `codex-light` `github-dark` `github-light` `tokyo-night` `dracula` `nord` (`codex` selects `codex-light`; `dark`/`light` are aliases) | `claude` |
 | `metric` | `tokens` `cost` | `tokens` |
 | `weeks` | `1..53` | `26` |
 | `border` | `true` `false` | `false` on Node; ignored by Worker |
@@ -173,13 +204,7 @@ checkbox is checked.
 | Node social PNG | `/u/alice.png?theme=codex-dark` |
 | Node portrait PNG | `/u/alice.png?shape=portrait&theme=codex-light` |
 | Node badge PNG | `/u/alice.png?card=badge&theme=codex-dark` |
-| Report preview and embeds | Select either Codex variant in **Customize & share** |
-
-Direct light-theme badge:
-
-```md
-![my coding heatmap](https://ccmap.fim.ai/u/alice.svg?theme=codex-light)
-```
+| Report preview and embeds | Select `codex` or either explicit Codex variant in **Customize & share** |
 
 ### Auto light/dark (follow the viewer's GitHub theme)
 
