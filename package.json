@@ -1,6 +1,6 @@
 {
   "name": "@tao-hpu/ccmap",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Coding heatmap for Claude Code + Codex + Grok + DeepSeek Harness \u2014 scan local logs, render a GitHub-style heatmap, push aggregates to a badge endpoint.",
   "type": "module",
   "bin": {

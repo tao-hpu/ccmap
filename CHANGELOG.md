@@ -6,6 +6,8 @@ package version (each release is tagged `vX.Y.Z` in git).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-18
+
 ### Added
 
 - **DeepSeek Harness is now a fourth source.** ccmap reads `$DSH_HOME/sessions`
@@ -29,7 +31,7 @@ package version (each release is tagged `vX.Y.Z` in git).
   cache-write rates for GPT-5.6 models.
 - The push payload gains optional `days[].deepseek`, `totals.bySource.deepseek`,
   and `unpricedTokens` (omitted when zero). Older clients and servers keep
-  working; hosted reports need a redeploy to chart the new source.
+  working; self-hosted servers need a redeploy to chart the new source.
 - First runtime dependency: `fzstd@0.1.1`, used only by the Harness scanner.
   The badge server does not import it.
 
@@ -332,6 +334,10 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.3.0]: https://github.com/tao-hpu/ccmap/releases/tag/v0.3.0
+[0.2.0]: https://github.com/tao-hpu/ccmap/releases/tag/v0.2.0
+[0.1.16]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.16
+[0.1.15]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.15
 [0.1.14]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.14
 [0.1.13]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.13
 [0.1.12]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.12
