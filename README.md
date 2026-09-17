@@ -258,6 +258,13 @@ Code that shipped, in order of first contribution.
 <table>
   <tr>
     <td align="center" width="140">
+      <a href="https://github.com/tao-hpu">
+        <img src="https://github.com/tao-hpu.png?size=160" width="80" height="80" alt="tao-hpu" /><br />
+        <sub><b>tao-hpu</b></sub>
+      </a><br />
+      <sub>Author</sub>
+    </td>
+    <td align="center" width="140">
       <a href="https://github.com/SyloYamtao">
         <img src="https://github.com/SyloYamtao.png?size=160" width="80" height="80" alt="SyloYamtao" /><br />
         <sub><b>SyloYamtao</b></sub>
