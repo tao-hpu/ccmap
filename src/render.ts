@@ -105,7 +105,7 @@ function fmt(n: number): string {
 // Render a GitHub-style contribution heatmap as a standalone SVG string.
 export function renderSVG(
   days: Map<string, DayStat>,
-  totals: { totalTokens: number; totalCost: number; streak: number },
+  totals: { totalTokens: number; totalCost: number; streak: number; unpricedTokens?: number },
   opts: RenderOptions = {}
 ): string {
   const weeks = opts.weeks ?? 26;
@@ -168,7 +168,7 @@ export function renderSVG(
     const y = padTop + row * STEP;
     let tip = key;
     if (ds && ds.tokens > 0) {
-      const parts = [`${fmt(ds.tokens)} tok`, `$${ds.cost.toFixed(2)}`];
+      const parts = [`${fmt(ds.tokens)} tok`, `$${ds.cost.toFixed(2)}${ds.unpricedTokens ? " (partial estimate)" : ""}`];
       if (ds.bySource) {
         const mix = SOURCES.filter((s) => (ds.bySource[s] ?? 0) > 0).map((s) => `${s} ${fmt(ds.bySource[s])}`);
         if (mix.length) parts.push(mix.join(" / "));
@@ -196,7 +196,7 @@ export function renderSVG(
   }
 
   const title = opts.title ?? "Coding heatmap";
-  const sub = `${fmt(totals.totalTokens)} tokens · $${totals.totalCost.toFixed(0)} · 🔥 ${totals.streak}d streak`;
+  const sub = `${fmt(totals.totalTokens)} tokens · $${totals.totalCost.toFixed(0)}${totals.unpricedTokens ? " (partial)" : ""} · 🔥 ${totals.streak}d streak`;
 
   // month labels along the top
   const monthLabels: string[] = [];

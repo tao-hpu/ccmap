@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import worker from "../server/src/index.js";
 import { THEMES } from "../src/render.js";
+import { renderSocialCard, renderPortraitCard } from "../src/report.js";
 import {
   createPushPayload,
   geometrySignature,
@@ -184,5 +185,44 @@ test("Node PNG routes preserve a Codex theme in their SVG fallback", async (t) =
       assert.equal(fallback.pathname, `/u/${payload.user}.svg`);
       assert.equal(fallback.searchParams.get("theme"), "codex-dark");
     }
+  }
+});
+
+test("DeepSeek aggregates survive push and appear in Node and Worker reports and badges", async (t) => {
+  const payload = createPushPayload("deepseek-user");
+  payload.totals.tokens += 80;
+  payload.totals.bySource.deepseek = 80;
+  payload.totals.unpricedTokens = 80;
+  payload.byModel["custom-model"] = 80;
+  for (const day of payload.days) {
+    day.tokens += 10;
+    day.deepseek = 10;
+    day.unpricedTokens = 10;
+  }
+  const node = await startNodeServer(createPushPayload());
+  t.after(() => node.child.kill("SIGTERM"));
+  const kv = new MemoryKv();
+  const env = { USERS: kv } as never;
+  const key = "test-deepseek-key-not-a-real-secret";
+  for (const request of [
+    (path: string, init?: RequestInit) => fetch(node.base + path, init),
+    (path: string, init?: RequestInit) => worker.fetch(new Request(node.base + path, init), env),
+  ]) {
+    const claim = await request("/api/claim", { method: "POST", body: JSON.stringify({ user: payload.user, key }) });
+    assert.equal(claim.status, 200);
+    const push = await request("/api/push", { method: "POST", headers: { authorization: `Bearer ${key}` }, body: JSON.stringify(payload) });
+    assert.equal(push.status, 200);
+    const html = await (await request(`/u/${payload.user}`)).text();
+    assert.match(html, /DeepSeek Harness/);
+    assert.match(html, /deepseek 10/);
+    assert.match(html, /Cost estimate excludes 80 tokens/);
+    const svg = await (await request(`/u/${payload.user}.svg`)).text();
+    assert.match(svg, /deepseek 10/);
+    assert.match(svg, /partial/);
+  }
+  for (const render of [renderSocialCard, renderPortraitCard]) {
+    const svg = render(payload);
+    assert.match(svg, /partial est\./);
+    assert.match(svg, /116 tokens/);
   }
 });

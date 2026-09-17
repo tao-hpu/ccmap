@@ -18,8 +18,7 @@ function bearer(req: Request): string {
   return a.startsWith("Bearer ") ? a.slice(7) : "";
 }
 
-// `grok` was added in 0.2.0; clients older than that omit it, so it stays
-// optional and every read defaults to 0.
+// Added sources and unpriced counts are optional for older clients and records.
 interface PushDay {
   date: string;
   tokens: number;
@@ -27,13 +26,15 @@ interface PushDay {
   claude: number;
   codex: number;
   grok?: number;
+  deepseek?: number;
+  unpricedTokens?: number;
   sessions: number;
 }
 interface PushPayload {
   v: string;
   user: string;
   generatedAt: string;
-  totals: { tokens: number; cost: number; streak: number; bySource: { claude: number; codex: number; grok?: number } };
+  totals: { tokens: number; cost: number; streak: number; unpricedTokens?: number; bySource: { claude: number; codex: number; grok?: number; deepseek?: number } };
   byModel: Record<string, number>;
   days: PushDay[];
 }
@@ -55,7 +56,8 @@ function daysToMap(p: PushPayload): Map<string, any> {
       date: d.date,
       tokens: d.tokens,
       cost: d.cost,
-      bySource: { claude: d.claude, codex: d.codex, grok: d.grok ?? 0 },
+      unpricedTokens: d.unpricedTokens,
+      bySource: { claude: d.claude, codex: d.codex, grok: d.grok ?? 0, deepseek: d.deepseek ?? 0 },
       byModel: {},
       sessions: new Set(),
     });
@@ -123,7 +125,7 @@ async function handleBadge(user: string, url: URL, env: Env): Promise<Response> 
 
   const svg = renderSVG(
     daysToMap(p),
-    { totalTokens: p.totals.tokens, totalCost: p.totals.cost, streak: p.totals.streak },
+    { totalTokens: p.totals.tokens, totalCost: p.totals.cost, streak: p.totals.streak, unpricedTokens: p.totals.unpricedTokens },
     { metric, theme, weeks, anim, border: !hideBorder, title: `${user} · coding heatmap` }
   );
   return new Response(svg, {

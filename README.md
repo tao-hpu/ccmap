@@ -1,6 +1,6 @@
 # ccmap
 
-Coding heatmap for **Claude Code + Codex + Grok**. Scans your local CLI logs and renders a
+Coding heatmap for **Claude Code + Codex + Grok + DeepSeek Harness**. Scans local logs and renders a
 GitHub-style contribution heatmap — in your terminal, as a local SVG/HTML report, or
 published to a public **report page** (`https://.../u/<you>`) with an embeddable badge.
 
@@ -60,12 +60,31 @@ Don't want to install? `npx @tao-hpu/ccmap@latest scan` runs it once, always lat
 - Claude Code: `~/.claude/projects/**/*.jsonl` (assistant `message.usage`)
 - Codex: `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (`token_count` events)
 - Grok: `~/.grok/sessions/**/updates.jsonl` (`turn_completed` events)
+- DeepSeek Harness: `~/.dsh/sessions/**/session[.vN].jsonl[.zstd]`
+  (v0–v3; `$DSH_HOME/sessions` when `DSH_HOME` is set)
 
 Each engine you've used shows up on its own in the model mix, the daily chart and
 the engine-split donut; ones you haven't are simply absent. Grok's logs are much
 larger than the others (multi-GB is routine), so scans keep a small per-file
 cache at `~/.ccmap/scan-cache.json` and only re-read logs that have changed —
 a warm scan stays around a second no matter how much history has piled up.
+
+DeepSeek Harness logs are read locally, including Zstandard compression; no
+system `zstd` command or running Harness process is required. Only the highest
+format generation in each session directory is counted. Fork-inherited history
+is excluded, while new subagent calls and retries with recorded usage count.
+Cached input is counted separately from uncached input; reasoning tokens are
+already part of output and are not added again. Usage belongs to the Harness
+source even when it runs a different provider's model.
+
+DeepSeek's separate cache (`~/.ccmap/scan-cache.json.deepseek`) is invalidated by
+log, timezone, parser or pricing changes. It uses the same per-file cache helpers
+as Grok, with separate storage so each source's cleanup cannot evict the other's
+entries. Missing usage is never inferred from text. Unreadable logs, unknown
+formats and malformed usage produce local warnings; complete records before an
+incomplete tail are retained. ccmap never
+rewrites or migrates Harness logs. JSONL persistence is supported; SQLite and
+unrecorded auxiliary/search calls are not scanned.
 
 ## Local history (so your heatmap keeps filling up)
 
@@ -79,7 +98,7 @@ To stop losing history going forward, every `scan` / `render` / `report` /
 (a few KB/year), kept per engine so one CLI's pruning never costs you another's
 history. Once a day is recorded it stays on the heatmap **even after Claude Code
 deletes the raw transcript** — so the map keeps lighting up over time. This is
-fully automatic and local: it touches **no** Claude Code / Codex / Grok config,
+fully automatic and local: it touches **no** Claude Code / Codex / Grok / Harness config,
 and nothing extra leaves your machine.
 
 > Run regularly (e.g. `ccmap start`, which pushes daily) so each day is captured
@@ -130,6 +149,30 @@ ccmap uses that number instead of estimating. It accounts for backend search and
 tool calls that a token count alone can't, which is why Grok's cost per token can
 look higher than the table would suggest. The Grok entries in the table are only
 a fallback for turns that logged tokens without a cost.
+
+DeepSeek Harness uses a **current-price estimate**, not a reconstruction of
+historical invoices. The built-in USD rates, checked against
+[DeepSeek's official pricing](https://api-docs.deepseek.com/quick_start/pricing/)
+on 2026-09-17, are per 1M tokens:
+
+| Model | Uncached input (peak / off-peak) | Cached input (peak / off-peak) | Output (peak / off-peak) |
+| --- | --- | --- | --- |
+| `deepseek-flash` | $0.30 / $0.15 | $0.006 / $0.003 | $1.20 / $0.60 |
+| `deepseek-v4-pro` | $1.32 / $0.66 | $0.044 / $0.022 | $3.96 / $1.98 |
+
+`deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` use the current Flash
+rate. Peak hours are Monday–Friday, 01:00–04:00 and 06:00–10:00 **UTC**, selected
+using each attempt's start time. Off-peak hours (including weekends) are
+half-price; attempts crossing a time boundary keep their start-time rate.
+Daily activity uses the completion time in the
+local timezone. Official rates apply only to the `deepseek-official` provider.
+Unknown models/providers still contribute tokens; their unpriced tokens are
+excluded from cost and the displayed estimate is marked **partial**.
+
+For Harness models, the longest matching user override (case-insensitive)
+takes precedence over built-in rates and is used as a flat rate without the
+off-peak discount. For example, a custom provider can be configured with
+`"pricing": { "my-model": { "in": 1, "out": 2, "cr": 0.1, "cw": 0 } }`.
 
 Override any model in `~/.ccmap/config.json`:
 
@@ -234,8 +277,16 @@ interchangeable backends, same API:
 
 Push payloads are forward-compatible: fields a server doesn't know about are
 ignored, so an old server keeps accepting pushes from a new CLI. It just won't
-chart what it can't read — after the CLI learns a new engine (Grok, in 0.2.0),
-redeploy the server to see it on the hosted report page.
+chart what it can't read — after the CLI learns a new engine, redeploy the
+server to see it on the hosted report page. DeepSeek adds optional source counts
+in `days[].deepseek` and `totals.bySource.deepseek`. Optional `unpricedTokens` in
+daily records and totals counts tokens whose cost could not be estimated; these
+tokens remain in the token totals but contribute nothing to the reported cost.
+The uploader omits `unpricedTokens` when zero, and both server implementations
+treat missing fields as zero, accepting older payloads unchanged. These fields
+contain only aggregates, never prompts, project paths or raw events. The public
+service needs an updated deployment to display DeepSeek's source split and
+partial costs.
 
 Optional write gate: set `PUSH_SECRET`; clients pass `ccmap login --invite <code>`.
 No accounts: your first push mints a local secret and the server stores only its

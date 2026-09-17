@@ -1,9 +1,13 @@
 lockfileVersion: 5.3
 
 specifiers:
+  fzstd: 0.1.1
   '@types/node': ^22.0.0
   tsx: ^4.19.0
   typescript: ^5.6.0
+
+dependencies:
+  fzstd: 0.1.1
 
 devDependencies:
   '@types/node': 22.20.0
@@ -11,6 +15,10 @@ devDependencies:
   typescript: 5.9.3
 
 packages:
+
+  /fzstd/0.1.1:
+    resolution: {integrity: sha512-dkuVSOKKwh3eas5VkJy1AW1vFpet8TA/fGmVA5krThl8YcOVE/8ZIoEA1+U1vEn5ckxxhLirSdY837azmbaNHA==}
+    dev: false
 
   /@esbuild/aix-ppc64/0.28.1:
     resolution: {integrity: sha512-Svl7tq8k/08+p6CXPpRjQ1fKX+1odH/BQbb48fV6fj3CWHhsoIOoY87w1oHXm0qEpkIK3ZfVgp0hed3XBXzXMQ==}
