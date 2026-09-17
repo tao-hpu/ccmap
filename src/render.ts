@@ -75,7 +75,12 @@ export const THEMES: Record<string, Theme> = {
   },
 };
 
-const THEME_ALIASES: Record<string, string> = { dark: "github-dark", light: "github-light" };
+// Shorthand names select the light variant when a theme family has one.
+const THEME_ALIASES: Record<string, string> = {
+  dark: "github-dark",
+  light: "github-light",
+  codex: "codex-light",
+};
 
 export function resolveTheme(name?: string): Theme {
   const key = (name && (THEME_ALIASES[name] ?? name)) || "github-dark";
