@@ -6,13 +6,15 @@ package version (each release is tagged `vX.Y.Z` in git).
 
 ## [Unreleased]
 
-### Changed
-
-- Updated built-in Codex model prices, including separate cache-read and
-  cache-write rates for GPT-5.6 models.
-
 ### Added
 
+- **DeepSeek Harness is now a fourth source.** ccmap reads `$DSH_HOME/sessions`
+  or `~/.dsh/sessions` (`session[.vN].jsonl[.zstd]`, v0–v3). Zstandard logs are
+  decoded in-process; only the newest generation in a directory is counted;
+  fork-inherited history is skipped. Uncached input, cache read/write and output
+  are disjoint; reasoning tokens stay inside output. Official `deepseek-flash` /
+  `deepseek-v4-pro` rates follow the 2026-09-17 peak/off-peak card; unknown
+  models keep their tokens and mark the estimate as partial.
 - Added `codex` as a theme shorthand across the CLI, hosted reports, badge
   URLs, and adaptive embeds; it resolves to `codex-light` for direct renders.
 - Added `codex-dark` and `codex-light` across terminal output, local SVG and
@@ -20,6 +22,16 @@ package version (each release is tagged `vX.Y.Z` in git).
   saved configuration, help, and the report selector.
 - Adaptive README embeds selected from either Codex variant now pair
   `codex-dark` with `codex-light`.
+
+### Changed
+
+- Updated built-in Codex model prices, including separate cache-read and
+  cache-write rates for GPT-5.6 models.
+- The push payload gains optional `days[].deepseek`, `totals.bySource.deepseek`,
+  and `unpricedTokens` (omitted when zero). Older clients and servers keep
+  working; hosted reports need a redeploy to chart the new source.
+- First runtime dependency: `fzstd@0.1.1`, used only by the Harness scanner.
+  The badge server does not import it.
 
 ### Fixed
 
@@ -30,8 +42,9 @@ package version (each release is tagged `vX.Y.Z` in git).
 - Node PNG routes now preserve the selected theme when an unavailable optional
   rasterizer redirects to the SVG badge.
 
-These changes do not affect push payloads, authentication fields, stored usage records,
-source-log access, dependency, or privacy boundary.
+Authentication fields, stored usage records, source-log access, and the privacy
+boundary are unchanged: logs stay local, and pushes still carry only per-day
+aggregates and model names.
 
 ## [0.2.0] — 2026-08-21
 

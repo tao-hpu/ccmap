@@ -294,7 +294,7 @@ No accounts: your first push mints a local secret and the server stores only its
 
 ## Status
 
-- ✅ Local: `scan` / `render` / `report` / `login` / `push` / `start` — verified against real Claude Code, Codex and Grok logs.
+- ✅ Local: `scan` / `render` / `report` / `login` / `push` / `start` — verified against real Claude Code, Codex, Grok and DeepSeek Harness logs.
 - ✅ Server: **live at `https://ccmap.fim.ai`** (Node, `src/server.ts`) — claim, per-user
   auth, badge + HTML report all verified end-to-end. Cloudflare Worker (`server/`) is an
   interchangeable alternative.
