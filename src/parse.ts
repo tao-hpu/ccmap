@@ -1,9 +1,11 @@
 import { readdirSync, statSync, existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import { homedir } from "node:os";
-import { costOf, type Price } from "./pricing.js";
+import { createHash } from "node:crypto";
+import { costOf, DEEPSEEK_PRICE_REVISION, type Price } from "./pricing.js";
 import { SOURCES, emptyBySource, emptySrc, fromSrc, type DayStat, type Source } from "./sources.js";
 import { eachLineMatching } from "./lines.js";
+import { findDeepSeekSessions, readDeepSeekSession } from "./deepseek.js";
 import { loadRollup, saveRollup, mergeDays, dayStatToRecord, type DayRecord } from "./rollup.js";
 import {
   fresh,
@@ -20,6 +22,8 @@ export interface ScanResult {
   days: Map<string, DayStat>;
   totalTokens: number;
   totalCost: number;
+  unpricedTokens: number;
+  warnings: string[];
   byModel: Record<string, number>;
   bySource: Record<Source, number>;
   firstDay?: string;
@@ -77,16 +81,19 @@ function add(
   model: string,
   tokens: number,
   cost: number,
-  session: string
+  session: string,
+  unpricedTokens = 0
 ) {
   if (!date) return;
   const d = ensureDay(days, date);
   const s = d.src[source];
   s.tokens += tokens;
   s.cost += cost;
+  if (unpricedTokens) s.unpricedTokens = (s.unpricedTokens ?? 0) + unpricedTokens;
   s.byModel[model] = (s.byModel[model] || 0) + tokens;
   d.tokens += tokens;
   d.cost += cost;
+  if (unpricedTokens) d.unpricedTokens = (d.unpricedTokens ?? 0) + unpricedTokens;
   d.bySource[source] += tokens;
   d.byModel[model] = (d.byModel[model] || 0) + tokens;
   if (session) d.sessions.add(session);
@@ -96,13 +103,14 @@ export interface ScanOptions {
   claudeDir?: string;
   codexDir?: string;
   grokDir?: string;
+  deepseekDir?: string;
   pricing?: Record<string, Price>;
   // Path to the persistent daily rollup. When set, scan merges the live log
   // scan with previously-seen days (so pruned history survives) and writes the
   // merged result back. Omit it (e.g. in tests) for a pure, side-effect-free scan.
   rollupPath?: string;
-  // Path to the per-file scan cache. When set, unchanged Grok session logs are
-  // replayed from the cache instead of re-read. Omit for a cold scan.
+  // Grok uses this file; DeepSeek uses a separate `${cachePath}.deepseek`
+  // namespace. Omit for a cold scan without cache writes.
   cachePath?: string;
 }
 
@@ -110,16 +118,18 @@ export interface ScanOptions {
 function summarize(days: Map<string, DayStat>) {
   let totalTokens = 0;
   let totalCost = 0;
-  const byModel: Record<string, number> = {};
+  let unpricedTokens = 0;
+  const byModel: Record<string, number> = Object.create(null);
   const bySource = emptyBySource();
   const dates = [...days.keys()].sort();
   for (const d of days.values()) {
     totalTokens += d.tokens;
     totalCost += d.cost;
+    unpricedTokens += d.unpricedTokens ?? 0;
     for (const s of SOURCES) bySource[s] += d.bySource[s] ?? 0;
     for (const [m, v] of Object.entries(d.byModel)) byModel[m] = (byModel[m] || 0) + v;
   }
-  return { totalTokens, totalCost, byModel, bySource, firstDay: dates[0], lastDay: dates[dates.length - 1] };
+  return { totalTokens, totalCost, unpricedTokens, byModel, bySource, firstDay: dates[0], lastDay: dates[dates.length - 1] };
 }
 
 // The Grok CLI reports the cost it billed for each turn in `costUsdTicks`.
@@ -300,11 +310,60 @@ function scanGrok(
   if (cache) for (const key of [...cache.keys()]) if (!stillThere.has(key)) cache.delete(key);
 }
 
+interface DeepSeekSessionCache extends CachedFile {
+  id: string;
+  fingerprint: string;
+}
+
+function scanDeepSeek(
+  days: Map<string, DayStat>,
+  dir: string,
+  pricing: Record<string, Price> | undefined,
+  cache: Map<string, CachedFile> | null
+): string[] {
+  const fingerprint = createHash("sha256").update(JSON.stringify([
+    1, DEEPSEEK_PRICE_REVISION, Intl.DateTimeFormat().resolvedOptions().timeZone,
+    Object.entries(pricing ?? {}).sort(([a], [b]) => a.localeCompare(b)),
+  ])).digest("hex");
+  const warnings: string[] = [];
+  const seen = new Set<string>();
+  const retained = new Set<string>();
+  const files = findDeepSeekSessions(dir, warnings)
+    .sort((a, b) => b.version - a.version || a.file.localeCompare(b.file));
+  for (const candidate of files) {
+    const before = cache ? stampOf(candidate.file) : null;
+    const hit = (cache ? fresh(cache.get(candidate.file), candidate.file) : null) as DeepSeekSessionCache | null;
+    const result = hit?.fingerprint === fingerprint && typeof hit.id === "string"
+      ? { id: hit.id, days: hit.days, warnings: [] }
+      : readDeepSeekSession(candidate, pricing);
+    warnings.push(...result.warnings);
+    if (!result.id) continue;
+    if (seen.has(result.id)) { warnings.push(`DeepSeek: duplicate session ${result.id} skipped`); continue; }
+    seen.add(result.id);
+    for (const [date, d] of Object.entries(result.days)) {
+      for (const [model, v] of Object.entries(d.m)) add(days, date, "deepseek", model, v.t, v.c, "", v.u);
+      const target = ensureDay(days, date);
+      for (const s of d.s) target.sessions.add(s);
+    }
+    const after = cache ? stampOf(candidate.file) : null;
+    // Partial or changing logs must be read again on the next scan.
+    if (cache && !result.warnings.length && before && after && before.size === after.size && before.mtime === after.mtime) {
+      cache.set(candidate.file, { ...after, days: result.days, id: result.id, fingerprint } as DeepSeekSessionCache);
+      retained.add(candidate.file);
+    }
+  }
+  // Also evict superseded generations and duplicate copies, not just deleted logs.
+  if (cache) for (const key of [...cache.keys()]) if (!retained.has(key)) cache.delete(key);
+  return warnings;
+}
+
 export function scan(opts: ScanOptions = {}): ScanResult {
   const days = new Map<string, DayStat>();
   const claudeDir = opts.claudeDir ?? join(homedir(), ".claude", "projects");
   const codexDir = opts.codexDir ?? join(homedir(), ".codex", "sessions");
   const grokDir = opts.grokDir ?? join(homedir(), ".grok", "sessions");
+  const deepseekDir = opts.deepseekDir ?? join(process.env.DSH_HOME || join(homedir(), ".dsh"), "sessions");
+  const warnings: string[] = [];
 
   if (existsSync(claudeDir)) scanClaude(days, claudeDir, opts.pricing);
   if (existsSync(codexDir)) scanCodex(days, codexDir, opts.pricing);
@@ -312,6 +371,14 @@ export function scan(opts: ScanOptions = {}): ScanResult {
     const cache = opts.cachePath ? loadScanCache(opts.cachePath) : null;
     scanGrok(days, grokDir, opts.pricing, cache);
     if (cache && opts.cachePath) saveScanCache(cache, opts.cachePath);
+  }
+  if (existsSync(deepseekDir)) {
+    // Reuse the per-file cache helpers in a separate namespace so Grok's
+    // deleted-file cleanup cannot evict DeepSeek sessions, or vice versa.
+    const cachePath = opts.cachePath ? `${opts.cachePath}.deepseek` : undefined;
+    const cache = cachePath ? loadScanCache(cachePath) : null;
+    warnings.push(...scanDeepSeek(days, deepseekDir, opts.pricing, cache));
+    if (cache && cachePath) saveScanCache(cache, cachePath);
   }
 
   // --- merge with the persistent rollup so pruned days survive ---
@@ -323,7 +390,7 @@ export function scan(opts: ScanOptions = {}): ScanResult {
     saveRollup(rec, opts.rollupPath);
   }
 
-  return { days: result, ...summarize(result) };
+  return { days: result, ...summarize(result), warnings };
 }
 
 // Longest run of consecutive active days ending at `today`.

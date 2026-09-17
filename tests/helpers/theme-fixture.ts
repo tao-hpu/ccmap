@@ -17,17 +17,20 @@ export interface ThemePushPayload {
   totals: {
     tokens: number;
     cost: number;
+    unpricedTokens?: number;
     streak: number;
-    bySource: { claude: number; codex: number; grok: number };
+    bySource: { claude: number; codex: number; grok: number; deepseek?: number };
   };
   byModel: Record<string, number>;
   days: {
     date: string;
     tokens: number;
     cost: number;
+    unpricedTokens?: number;
     claude: number;
     codex: number;
     grok: number;
+    deepseek?: number;
     sessions: number;
   }[];
 }

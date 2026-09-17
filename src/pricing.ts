@@ -102,3 +102,40 @@ export function costOf(model: string, t: TokenBreakdown, overrides?: Record<stri
     1_000_000
   );
 }
+
+// Current USD estimates, not reconstruction of historical invoices.
+// https://api-docs.deepseek.com/quick_start/pricing/ (2026-09-17)
+export const DEEPSEEK_PRICE_REVISION = "2026-09-17";
+const DEEPSEEK_FLASH: Price = { in: .3, cr: .006, out: 1.2, cw: 0, cw1h: 0 };
+const DEEPSEEK_PRO: Price = { in: 1.32, cr: .044, out: 3.96, cw: 0, cw1h: 0 };
+const DEEPSEEK_PRICES: Record<string, Price> = {
+  "deepseek-flash": DEEPSEEK_FLASH,
+  "deepseek-v4-flash": DEEPSEEK_FLASH,
+  "deepseek-v4-flash-vision-exp": DEEPSEEK_FLASH,
+  "deepseek-v4-pro": DEEPSEEK_PRO,
+};
+
+export function deepSeekCost(
+  model: string,
+  provider: string,
+  tokens: TokenBreakdown,
+  startedAt: number,
+  overrides?: Record<string, Price>,
+): number | undefined {
+  const name = model.toLowerCase();
+  const rule = Object.entries(overrides ?? {})
+    .filter(([key]) => key.length > 0 && name.includes(key.toLowerCase()))
+    .sort(([a], [b]) => b.length - a.length)[0]?.[1];
+  const price = rule ?? (provider === "deepseek-official" ? DEEPSEEK_PRICES[name] : undefined);
+  // Official DeepSeek usage has no separately billed cache-write bucket.
+  // A custom provider that reports one needs an explicit user price.
+  if (!price || (!rule && tokens.cacheWrite > 0)) return undefined;
+  if ([price.in, price.out, price.cr, price.cw].some(value => !Number.isFinite(value) || value < 0)) return undefined;
+  const date = new Date(startedAt);
+  const hour = date.getUTCHours();
+  const weekday = date.getUTCDay();
+  const peak = weekday >= 1 && weekday <= 5 && (hour >= 1 && hour < 4 || hour >= 6 && hour < 10);
+  const multiplier = rule || peak ? 1 : .5;
+  return multiplier * (tokens.input * price.in + tokens.output * price.out
+    + tokens.cacheRead * price.cr + tokens.cacheWrite * price.cw) / 1e6;
+}

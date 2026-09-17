@@ -95,20 +95,20 @@ test("scan persists days and they survive after raw logs are pruned", () => {
   writeFileSync(join(projDir, "session.jsonl"), line + "\n");
 
   // first scan sees the live log and freezes it into the rollup
-  const r1 = scan({ claudeDir: logDir, codexDir: emptyDir, grokDir: emptyDir, rollupPath });
+  const r1 = scan({ deepseekDir: emptyDir, claudeDir: logDir, codexDir: emptyDir, grokDir: emptyDir, rollupPath });
   assert.equal(r1.totalTokens, 150);
   const date = [...r1.days.keys()][0];
   assert.ok(date);
 
   // logs pruned: scan an empty dir — the day must still come from the rollup
-  const r2 = scan({ claudeDir: emptyDir, codexDir: emptyDir, grokDir: emptyDir, rollupPath });
+  const r2 = scan({ deepseekDir: emptyDir, claudeDir: emptyDir, codexDir: emptyDir, grokDir: emptyDir, rollupPath });
   assert.ok(r2.days.has(date), "pruned day should survive in rollup");
   assert.equal(r2.totalTokens, 150);
 });
 
 test("scan without rollupPath stays pure (no merge, no persistence)", () => {
   const emptyDir = tmp();
-  const r = scan({ claudeDir: emptyDir, codexDir: emptyDir, grokDir: emptyDir });
+  const r = scan({ deepseekDir: emptyDir, claudeDir: emptyDir, codexDir: emptyDir, grokDir: emptyDir });
   assert.equal(r.totalTokens, 0);
   assert.equal(r.days.size, 0);
 });

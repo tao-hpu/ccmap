@@ -45,7 +45,7 @@ export function dayStatToRecord(d: DayStat): DayRecord {
   const src: Partial<Record<Source, SourceStat>> = {};
   for (const s of SOURCES) {
     const v = d.src?.[s];
-    if (v && v.tokens > 0) src[s] = { tokens: v.tokens, cost: v.cost, byModel: { ...v.byModel } };
+    if (v && v.tokens > 0) src[s] = { ...v, byModel: { ...v.byModel } };
   }
   return {
     date: d.date,
@@ -69,7 +69,8 @@ function srcOfRecord(r: DayRecord): Record<Source, SourceStat> {
   if (r.src) {
     for (const s of SOURCES) {
       const v = r.src[s];
-      if (v) out[s] = { tokens: v.tokens || 0, cost: v.cost || 0, byModel: { ...(v.byModel ?? {}) } };
+      if (v) out[s] = { tokens: v.tokens || 0, cost: v.cost || 0, byModel: { ...(v.byModel ?? {}) },
+        ...(v.unpricedTokens ? { unpricedTokens: v.unpricedTokens } : {}) };
     }
     return out;
   }
@@ -150,7 +151,7 @@ export function mergeDays(
     for (const k of SOURCES) {
       // live wins ties — it carries real session ids
       const win = ls[k].tokens >= ss[k].tokens ? ls[k] : ss[k];
-      merged[k] = { tokens: win.tokens, cost: win.cost, byModel: { ...win.byModel } };
+      merged[k] = { ...win, byModel: { ...win.byModel } };
     }
     const sessions = new Set<string>(l?.sessions ?? []);
     for (let i = 0; sessions.size < (s?.sessions ?? 0); i++) sessions.add(`_${i}`);

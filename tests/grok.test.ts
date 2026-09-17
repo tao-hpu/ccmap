@@ -57,7 +57,7 @@ test("grok turns roll up into tokens, cost and model mix", () => {
   const root = tmp();
   const empty = tmp();
   session(root, [NOISE, turn("p1", usage()), NOISE]);
-  const r = scan({ claudeDir: empty, codexDir: empty, grokDir: root });
+  const r = scan({ deepseekDir: empty, claudeDir: empty, codexDir: empty, grokDir: root });
   assert.equal(r.totalTokens, 1100);
   assert.equal(r.bySource.grok, 1100);
   assert.equal(r.bySource.claude, 0);
@@ -71,7 +71,7 @@ test("a repeated prompt_id is counted once", () => {
   const root = tmp();
   const empty = tmp();
   session(root, [turn("p1", usage()), turn("p1", usage()), turn("p2", usage())]);
-  const r = scan({ claudeDir: empty, codexDir: empty, grokDir: root });
+  const r = scan({ deepseekDir: empty, claudeDir: empty, codexDir: empty, grokDir: root });
   assert.equal(r.totalTokens, 2200);
 });
 
@@ -79,7 +79,7 @@ test("a turn with no reported cost falls back to the price table", () => {
   const root = tmp();
   const empty = tmp();
   session(root, [turn("p1", usage({ costUsdTicks: undefined }))]);
-  const r = scan({ claudeDir: empty, codexDir: empty, grokDir: root });
+  const r = scan({ deepseekDir: empty, claudeDir: empty, codexDir: empty, grokDir: root });
   assert.equal(r.totalTokens, 1100);
   // grok-4.5: 200 fresh in @ $5/M + 100 out @ $25/M + 800 cache read @ $1.25/M
   assert.ok(Math.abs(r.totalCost - (200 * 5 + 100 * 25 + 800 * 1.25) / 1e6) < 1e-9, `got ${r.totalCost}`);
@@ -95,7 +95,7 @@ test("cancelled turns (no usage) are skipped", () => {
     }),
     turn("p1", usage()),
   ]);
-  const r = scan({ claudeDir: empty, codexDir: empty, grokDir: root });
+  const r = scan({ deepseekDir: empty, claudeDir: empty, codexDir: empty, grokDir: root });
   assert.equal(r.totalTokens, 1100);
 });
 
@@ -105,7 +105,7 @@ test("the scan cache replays an unchanged log and drops deleted ones", () => {
   const cachePath = join(tmp(), "scan-cache.json");
   const file = session(root, [turn("p1", usage())]);
 
-  const cold = scan({ claudeDir: empty, codexDir: empty, grokDir: root, cachePath });
+  const cold = scan({ deepseekDir: empty, claudeDir: empty, codexDir: empty, grokDir: root, cachePath });
   const cached = JSON.parse(readFileSync(cachePath, "utf8"));
   assert.ok(cached.files[file], "the session log should be cached by path");
 
@@ -115,12 +115,12 @@ test("the scan cache replays an unchanged log and drops deleted ones", () => {
   assert.equal(warmFiles[file].days[DAY].m["grok-4.5-build"].t, 1100);
 
   // …but a real size/mtime change does invalidate it.
-  const warm = scan({ claudeDir: empty, codexDir: empty, grokDir: root, cachePath });
+  const warm = scan({ deepseekDir: empty, claudeDir: empty, codexDir: empty, grokDir: root, cachePath });
   assert.equal(warm.totalTokens, 0);
   assert.equal(cold.totalTokens, 1100);
 
   // and a log Grok has deleted leaves no cache entry behind
-  const gone = scan({ claudeDir: empty, codexDir: empty, grokDir: empty, cachePath });
+  const gone = scan({ deepseekDir: empty, claudeDir: empty, codexDir: empty, grokDir: empty, cachePath });
   assert.equal(gone.totalTokens, 0);
   assert.deepEqual(JSON.parse(readFileSync(cachePath, "utf8")).files, {});
 });

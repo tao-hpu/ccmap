@@ -24,17 +24,16 @@ function qrChip(url: string, x: number, y: number, size: number): string {
 // Normalized input shared by CLI (buildPayload) and Worker (PushPayload).
 export interface ReportData {
   user?: string;
-  // `grok` arrived in 0.2.0 — older clients (and older stored payloads) omit it,
-  // so every read of a source field goes through `?? 0`.
-  totals: { tokens: number; cost: number; streak: number; bySource: Partial<Record<EngineKey, number>> };
+  // Older clients and stored payloads omit newly added source fields.
+  totals: { tokens: number; cost: number; unpricedTokens?: number; streak: number; bySource: Partial<Record<EngineKey, number>> };
   byModel: Record<string, number>;
-  days: ({ date: string; tokens: number; cost: number } & Partial<Record<EngineKey, number>>)[];
+  days: ({ date: string; tokens: number; cost: number; unpricedTokens?: number } & Partial<Record<EngineKey, number>>)[];
 }
 
 // Display order and palette slot for each engine. Colours come from the active
 // theme's scale, so a new engine stays coherent across every theme.
 export type EngineKey = Source;
-const LABELS: Record<Source, string> = { claude: "Claude", codex: "Codex", grok: "Grok" };
+const LABELS: Record<Source, string> = { claude: "Claude", codex: "Codex", grok: "Grok", deepseek: "DeepSeek Harness" };
 const ENGINES: { key: EngineKey; label: string }[] = SOURCES.map((key) => ({ key, label: LABELS[key] }));
 
 // A theme's scale is four steps of one hue, so only its ends read as clearly
@@ -135,7 +134,7 @@ function build(){
   setText('s-md','![my coding heatmap]('+svg+')');
   setText('s-pic','<div align="center">\\n  <picture>\\n    <source media="(prefers-color-scheme: dark)" srcset="'+U+dark+rest+'" />\\n    <source media="(prefers-color-scheme: light)" srcset="'+U+light+rest+'" />\\n    <img src="'+U+dark+rest+'" alt="coding heatmap" />\\n  </picture>\\n</div>');
   setText('s-url',report);
-  $('tweet').href='https://twitter.com/intent/tweet?text='+encodeURIComponent('My Claude + Codex + Grok coding heatmap')+'&url='+encodeURIComponent(report);
+  $('tweet').href='https://twitter.com/intent/tweet?text='+encodeURIComponent('My coding activity heatmap')+'&url='+encodeURIComponent(report);
 }
 function copy(id,btn){navigator.clipboard.writeText($(id).textContent).then(function(){var o=btn.textContent;btn.textContent='✓ copied';setTimeout(function(){btn.textContent=o},1200)})}
 build();
@@ -223,7 +222,7 @@ function dailyChart(
       const x = pad + i * bw;
       const w = (bw - 2).toFixed(1);
       const mix = stack.map((e) => `${e.key} ${fmt(d[e.key] ?? 0)}`).join(" · ");
-      const title = `<title>${d.date}: ${fmt(d.tokens)} tok · $${d.cost.toFixed(2)}  (${mix})</title>`;
+      const title = `<title>${d.date}: ${fmt(d.tokens)} tok · $${d.cost.toFixed(2)}${d.unpricedTokens ? " (partial estimate)" : ""}  (${mix})</title>`;
       let y = H - 4;
       let r = "";
       // bottom-up, so the first engine in ENGINES caps the bar
@@ -460,7 +459,7 @@ function rankCard(tokens: number, c: ReturnType<typeof resolveTheme>): string {
     <div class="rk-body">
       <div class="rk-lv">RANK ${idx + 1} / ${TIERS.length} · by total tokens</div>
       <div class="rk-title">${esc(tier.title)}</div>
-      <div class="rk-sub">${fmt(tokens)} tokens consumed across Claude, Codex &amp; Grok</div>
+      <div class="rk-sub">${fmt(tokens)} tokens consumed across Claude, Codex, Grok &amp; DeepSeek Harness</div>
       ${progLine}
     </div>
   </div>${ladder}`;
@@ -517,7 +516,7 @@ export function renderSocialCard(d: ReportData, opts: ReportOptions = {}): strin
 
   const tx = 330; // right of mascot
   const titleSize = tier.title.length > 14 ? 54 : tier.title.length > 11 ? 64 : 80;
-  const cost = `$${Math.round(d.totals.cost).toLocaleString()}`;
+  const cost = `$${Math.round(d.totals.cost).toLocaleString()}${d.totals.unpricedTokens ? " (partial est.)" : ""}`;
   const sub = `${cost} · ${d.totals.streak}-day streak · ${d.days.length} active days`;
   const goal = next ? `${fmt(next.min - d.totals.tokens)} tokens to ${esc(next.title)}` : "top tier — ascended";
 
@@ -528,7 +527,7 @@ export function renderSocialCard(d: ReportData, opts: ReportOptions = {}): strin
   <g shape-rendering="crispEdges">${mascot}</g>
   <text x="${tx}" y="104" font-size="26" font-weight="700" fill="${c.scale[2]}">cc<tspan fill="${c.sub}">▪</tspan>map<tspan fill="${c.sub}" font-weight="400">  ·  RANK ${idx + 1} / ${TIERS.length}</tspan></text>
   <text x="${tx}" y="${104 + titleSize + 6}" font-size="${titleSize}" font-weight="700" fill="${c.text}">${esc(tier.title)}</text>
-  <text x="${tx}" y="${104 + titleSize + 52}" font-size="30" fill="${c.sub}">@${esc(user)} · Claude · Codex · Grok heatmap</text>
+  <text x="${tx}" y="${104 + titleSize + 52}" font-size="30" fill="${c.sub}">@${esc(user)} · coding activity</text>
   <text x="${tx}" y="328" font-size="44" font-weight="700" fill="${c.scale[2]}">${fmt(d.totals.tokens)} tokens<tspan font-size="26" font-weight="400" fill="${c.sub}">  · ${goal}</tspan></text>
   <text x="${tx}" y="366" font-size="28" fill="${c.sub}">${sub}</text>
   <g>${grid}</g>
@@ -585,7 +584,7 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
   }
 
   const titleSize = tier.title.length > 15 ? 40 : tier.title.length > 11 ? 50 : 60;
-  const cost = `$${Math.round(d.totals.cost).toLocaleString()}`;
+  const cost = `$${Math.round(d.totals.cost).toLocaleString()}${d.totals.unpricedTokens ? " (partial est.)" : ""}`;
   const sub = `${cost} · ${d.totals.streak}-day streak · ${d.days.length} active days`;
   const goal = next ? `${fmt(next.min - d.totals.tokens)} tokens to ${esc(next.title)}` : "top tier — ascended";
 
@@ -606,7 +605,7 @@ export function renderPortraitCard(d: ReportData, opts: ReportOptions = {}): str
   <g shape-rendering="crispEdges">${mascot}</g>
   <text x="${cx}" y="438" text-anchor="middle" font-size="23" font-weight="600" fill="${c.sub}" letter-spacing="2">RANK ${idx + 1} / ${TIERS.length} · BY TOTAL TOKENS</text>
   <text x="${cx}" y="${438 + titleSize + 8}" text-anchor="middle" font-size="${titleSize}" font-weight="700" fill="${c.text}">${esc(tier.title)}</text>
-  <text x="${cx}" y="${438 + titleSize + 52}" text-anchor="middle" font-size="25" fill="${c.sub}">@${esc(user)} · Claude · Codex · Grok heatmap</text>
+  <text x="${cx}" y="${438 + titleSize + 52}" text-anchor="middle" font-size="25" fill="${c.sub}">@${esc(user)} · coding activity</text>
   <text x="${cx}" y="640" text-anchor="middle" font-size="50" font-weight="700" fill="${c.scale[2]}">${fmt(d.totals.tokens)} tokens</text>
   <text x="${cx}" y="680" text-anchor="middle" font-size="25" fill="${c.sub}">${sub}</text>
   <g>${grid}</g>
@@ -646,11 +645,12 @@ export function renderReport(d: ReportData, opts: ReportOptions = {}): string {
       date: x.date,
       tokens: x.tokens,
       cost: x.cost,
+      unpricedTokens: x.unpricedTokens,
       bySource: Object.fromEntries(ENGINES.map((e) => [e.key, x[e.key] ?? 0])),
       byModel: {},
       sessions: new Set(),
     });
-  const heat = renderSVG(daysMap, { totalTokens: d.totals.tokens, totalCost: d.totals.cost, streak: d.totals.streak }, { theme: opts.theme ?? "claude", weeks: 53, anim: "cascade", border: false, title: "" })
+  const heat = renderSVG(daysMap, { totalTokens: d.totals.tokens, totalCost: d.totals.cost, streak: d.totals.streak, unpricedTokens: d.totals.unpricedTokens }, { theme: opts.theme ?? "claude", weeks: 53, anim: "cascade", border: false, title: "" })
     // inline at fixed px → overflows narrow screens; let it scale to the card width
     .replace("<svg ", `<svg style="max-width:100%;height:auto" `);
 
@@ -684,7 +684,7 @@ export function renderReport(d: ReportData, opts: ReportOptions = {}): string {
   ogQ.push(`v=${encodeURIComponent(opts.cacheBust || CARD_REV)}`);
   const ogImg = opts.origin ? `${opts.origin}/u/${user}.png?${ogQ.join("&")}` : "";
   const ogTitle = `${emo} ${esc(user)} — ${esc(tier.title)} on ccmap`;
-  const ogDesc = `🔥 ${fmt(d.totals.tokens)} tokens · 💰 $${Math.round(d.totals.cost).toLocaleString()} · 🗓️ ${d.totals.streak}-day streak across Claude, Codex &amp; Grok 🤖  👀 See your own coding heatmap → npm i -g @tao-hpu/ccmap`;
+  const ogDesc = `🔥 ${fmt(d.totals.tokens)} tokens · 💰 $${Math.round(d.totals.cost).toLocaleString()}${d.totals.unpricedTokens ? " (partial est.)" : ""} · 🗓️ ${d.totals.streak}-day streak across Claude, Codex, Grok &amp; DeepSeek Harness 🤖  👀 See your own coding heatmap → npm i -g @tao-hpu/ccmap`;
   const ogTags = !opts.origin
     ? ""
     : `<meta property="og:type" content="website">
@@ -837,8 +837,9 @@ ${ogTags}
   }
 </style></head><body><div class="wrap">
   <div class="head"><span class="brand-mark">cc<span class="brand-dot">▪</span>map</span><h1>${esc(user)} <span class="muted">· coding report</span></h1></div>
-  <div class="muted">Claude · Codex · Grok coding heatmap · ${range}</div>
+  <div class="muted">Claude · Codex · Grok · DeepSeek Harness coding heatmap · ${range}</div>
 
+  ${d.totals.unpricedTokens ? `<p class="muted">Cost estimate excludes ${fmt(d.totals.unpricedTokens)} tokens with no known price.</p>` : ""}
   ${rankCard(d.totals.tokens, c)}
 
   <div class="hl">≈ <b>${fmt(words)}</b> words written with AI${
@@ -847,7 +848,7 @@ ${ogTags}
 
   <div class="grid">
     ${stat("tokens", fmt(d.totals.tokens), "tokens")}
-    ${stat("est. cost", "$" + d.totals.cost.toFixed(0), "cost")}
+    ${stat(d.totals.unpricedTokens ? "partial est. cost" : "est. cost", "$" + d.totals.cost.toFixed(0), "cost")}
     ${stat("current streak", d.totals.streak + "d", "flame")}
     ${stat("longest streak", longest + "d", "trophy")}
     ${stat("active days", String(activeDays), "calendar")}
@@ -875,7 +876,7 @@ ${ogTags}
 
   ${opts.share ? `<div class="cta">
     <div class="cta-h">Want your own?${IC_ROCKET}</div>
-    <div class="cta-sub">A GitHub-style heatmap of your Claude Code, Codex &amp; Grok usage — free, 100% local, set up in 30 seconds.</div>
+    <div class="cta-sub">A GitHub-style heatmap of your Claude Code, Codex, Grok &amp; DeepSeek Harness usage — free, 100% local, set up in 30 seconds.</div>
     <div class="cta-row">
       <a class="cta-btn" href="${GITHUB}" target="_blank" rel="noopener">${IC_GITHUB}Get it on GitHub</a>
       <div class="cta-copy"><code id="cta-cmd">npm i -g @tao-hpu/ccmap</code><button onclick="copy('cta-cmd',this)">copy</button></div>

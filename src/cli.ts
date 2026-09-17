@@ -131,6 +131,8 @@ function buildPayload(res: ScanResult, cfg: Config) {
       claude: d.bySource.claude,
       codex: d.bySource.codex,
       grok: d.bySource.grok,
+      deepseek: d.bySource.deepseek,
+      ...(d.unpricedTokens ? { unpricedTokens: d.unpricedTokens } : {}),
       sessions: d.sessions.size,
     }));
   return {
@@ -142,6 +144,7 @@ function buildPayload(res: ScanResult, cfg: Config) {
       cost: Math.round(res.totalCost * 100) / 100,
       streak: currentStreak(res.days),
       bySource: res.bySource,
+      ...(res.unpricedTokens ? { unpricedTokens: res.unpricedTokens } : {}),
     },
     byModel: res.byModel, // tokens per model (no content, no project names)
     days,
@@ -210,13 +213,21 @@ function sparkline(days: Map<string, DayStat>, n = 30): string {
   return series.map((v) => chars[Math.round((v / max) * (chars.length - 1))]).join("");
 }
 
-function cmdScan(cfg: Config) {
+function scanLocal(cfg: Config): ScanResult {
   const res = scan({ pricing: cfg.pricing, rollupPath: ROLLUP_PATH, cachePath: SCAN_CACHE_PATH });
+  for (const warning of res.warnings.slice(0, 5)) console.error(warning);
+  if (res.warnings.length > 5) console.error(`DeepSeek: ${res.warnings.length - 5} additional log warnings`);
+  if (res.unpricedTokens) console.error(`Cost estimate is partial: ${res.unpricedTokens.toLocaleString()} tokens have no known price.`);
+  return res;
+}
+
+function cmdScan(cfg: Config) {
+  const res = scanLocal(cfg);
   const streak = currentStreak(res.days);
   console.log(`ccmap ${VERSION} — local scan`);
   console.log(`  range:    ${res.firstDay ?? "-"} → ${res.lastDay ?? "-"}  (${res.days.size} active days)`);
   console.log(`  tokens:   ${res.totalTokens.toLocaleString()}`);
-  console.log(`  cost~:    $${res.totalCost.toFixed(2)}  (estimate)`);
+  console.log(`  cost~:    $${res.totalCost.toFixed(2)}  (${res.unpricedTokens ? "partial estimate" : "estimate"})`);
   console.log(`  streak:   ${streak} day(s)`);
   const mix = SOURCES.map((s) => `${s} ${pct(res.bySource[s], res.totalTokens)}`).join(" · ");
   console.log(`  source:   ${mix}`);
@@ -268,10 +279,10 @@ function cmdRender(cfg: Config, args: string[]) {
   // --hide-border kept as a no-op alias since border is now off by default)
   const border = args.includes("--border");
   const rounded = args.includes("--rounded");
-  const res = scan({ pricing: cfg.pricing, rollupPath: ROLLUP_PATH, cachePath: SCAN_CACHE_PATH });
+  const res = scanLocal(cfg);
   const svg = renderSVG(
     res.days,
-    { totalTokens: res.totalTokens, totalCost: res.totalCost, streak: currentStreak(res.days) },
+    { totalTokens: res.totalTokens, totalCost: res.totalCost, streak: currentStreak(res.days), unpricedTokens: res.unpricedTokens },
     { weeks, metric, theme, anim, border, rounded, title: cfg.user ? `${cfg.user} · coding heatmap` : "Coding heatmap" }
   );
   writeFileSync(out, svg);
@@ -281,7 +292,7 @@ function cmdRender(cfg: Config, args: string[]) {
 function cmdReport(cfg: Config, args: string[]) {
   const out = argVal(args, "--out") ?? "ccmap-report.html";
   const theme = argVal(args, "--theme") ?? cfg.theme ?? "claude";
-  const res = scan({ pricing: cfg.pricing, rollupPath: ROLLUP_PATH, cachePath: SCAN_CACHE_PATH });
+  const res = scanLocal(cfg);
   const payload = buildPayload(res, cfg);
   const html = renderReport({ user: cfg.user, totals: payload.totals, byModel: payload.byModel, days: payload.days }, { theme, origin: cfg.endpoint });
   writeFileSync(out, html);
@@ -379,7 +390,7 @@ async function cmdPush(cfgIn: Config, hint = false, explicitUser?: string) {
   if (explicitUser && cleanName(explicitUser) !== cfg.user) {
     console.log(`note: already configured as "${cfg.user}". To switch names: ccmap login --user ${cleanName(explicitUser)}`);
   }
-  const res = scan({ pricing: cfg.pricing, rollupPath: ROLLUP_PATH, cachePath: SCAN_CACHE_PATH });
+  const res = scanLocal(cfg);
   const payload = buildPayload(res, cfg);
   const base = (cfg.endpoint ?? "").replace(/\/$/, "");
   try {
@@ -637,7 +648,7 @@ const THEME_HELP =
   "claude|claude-light|codex-dark|codex-light|github-dark|github-light|tokyo-night|dracula|nord|codex";
 
 function help() {
-  console.log(`ccmap ${VERSION} — coding heatmap for Claude Code + Codex + Grok
+  console.log(`ccmap ${VERSION} — coding heatmap for Claude Code + Codex + Grok + DeepSeek Harness
 
 Usage:
   ccmap scan                       Summarize local usage (no upload)

@@ -6,14 +6,14 @@ import { CONFIG_DIR } from "./config.js";
 // mtime are unchanged since the last scan can only produce the aggregates we
 // already computed — we replay those instead of re-reading the bytes.
 //
-// Only used for sources where one log file maps to exactly one session and
-// dedup never has to reach across files (Grok). Claude Code can repeat the same
-// assistant message across resumed transcripts, so its dedup is global and a
-// per-file cache would double-count; it stays on the live path.
+// Grok uses one log per session. DeepSeek uses a separate cache after selecting
+// one generation per session and deduplicates session ids before aggregation.
+// Claude Code can repeat assistant messages across resumed transcripts, so
+// its global dedup stays on the live path.
 export const SCAN_CACHE_PATH = join(CONFIG_DIR, "scan-cache.json");
 
 export interface CachedDay {
-  m: Record<string, { t: number; c: number }>; // tokens + cost per model
+  m: Record<string, { t: number; c: number; u?: number }>; // tokens, cost, unpriced tokens per model
   s: string[]; // session ids seen that day
 }
 export interface CachedFile {

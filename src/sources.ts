@@ -2,9 +2,8 @@
 // Deliberately free of any `node:` import — the Cloudflare Worker build pulls
 // render.ts/report.ts in, and anything they touch has to run on that runtime too.
 
-// Engines we scan. Adding one means: a key here, a parser in parse.ts, a colour
-// in report.ts, and nothing else — the rest is derived from this list.
-export const SOURCES = ["claude", "codex", "grok"] as const;
+// Engines we scan; renderers derive their source lists from this registry.
+export const SOURCES = ["claude", "codex", "grok", "deepseek"] as const;
 export type Source = (typeof SOURCES)[number];
 
 // One engine's slice of a day. This is the authoritative unit: totals, the
@@ -12,6 +11,7 @@ export type Source = (typeof SOURCES)[number];
 export interface SourceStat {
   tokens: number;
   cost: number; // estimated USD
+  unpricedTokens?: number; // usage without a known price; excluded from cost
   byModel: Record<string, number>;
 }
 
@@ -20,6 +20,7 @@ export interface DayStat {
   date: string; // local YYYY-MM-DD
   tokens: number; // total tokens (all kinds)
   cost: number; // estimated USD
+  unpricedTokens?: number;
   sessions: Set<string>;
   bySource: Record<Source, number>; // tokens per source
   byModel: Record<string, number>; // tokens per model
@@ -41,7 +42,7 @@ export function toBySource(v: Partial<Record<Source, number>> | undefined): Reco
 
 export function emptySrc(): Record<Source, SourceStat> {
   const o = {} as Record<Source, SourceStat>;
-  for (const s of SOURCES) o[s] = { tokens: 0, cost: 0, byModel: {} };
+  for (const s of SOURCES) o[s] = { tokens: 0, cost: 0, byModel: Object.create(null) };
   return o;
 }
 
@@ -49,11 +50,12 @@ export function emptySrc(): Record<Source, SourceStat> {
 // downstream (badge, report, push payload) reads the flat view; `src` exists so
 // the rollup can merge one engine's history without disturbing another's.
 export function fromSrc(date: string, src: Record<Source, SourceStat>, sessions: Set<string>): DayStat {
-  const d: DayStat = { date, src, tokens: 0, cost: 0, sessions, bySource: emptyBySource(), byModel: {} };
+  const d: DayStat = { date, src, tokens: 0, cost: 0, sessions, bySource: emptyBySource(), byModel: Object.create(null) };
   for (const s of SOURCES) {
     const v = src[s];
     d.tokens += v.tokens;
     d.cost += v.cost;
+    if (v.unpricedTokens) d.unpricedTokens = (d.unpricedTokens ?? 0) + v.unpricedTokens;
     d.bySource[s] = v.tokens;
     for (const [m, n] of Object.entries(v.byModel)) d.byModel[m] = (d.byModel[m] || 0) + n;
   }

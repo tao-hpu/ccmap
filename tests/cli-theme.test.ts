@@ -19,7 +19,7 @@ function temporaryHome(): string {
 function runCli(home: string, args: string[]): string {
   const result = spawnSync(process.execPath, [TSX, CLI, ...args], {
     cwd: ROOT,
-    env: { ...process.env, HOME: home, USERPROFILE: home },
+    env: { ...process.env, HOME: home, USERPROFILE: home, DSH_HOME: join(home, ".dsh") },
     encoding: "utf8",
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
