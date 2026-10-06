@@ -5,17 +5,68 @@ export interface Price {
   in: number;
   out: number;
   cw: number; // cache write, 5-minute TTL (= 1.25x input on Claude)
-  cr: number; // cache read (= 0.1x input)
+  cr: number; // cache read (0.1x input on most Claude models)
   cw1h?: number; // cache write, 1-hour TTL (= 2x input on Claude); defaults to 2x in
 }
 
+// Claude list prices: https://platform.claude.com/docs/en/about-claude/pricing
+// (checked 2026-10-06). cw = 1.25x in, cw1h = 2x in; cr = 0.1x in except
+// Fable/Mythos 5.1 (0.025x) and Opus 5.5 (0.05x).
+const FABLE_5: Price = { in: 10, out: 50, cw: 12.5, cr: 1, cw1h: 20 };
+const FABLE_5_1: Price = { in: 10, out: 50, cw: 12.5, cr: 0.25, cw1h: 20 };
+const OPUS_4: Price = { in: 15, out: 75, cw: 18.75, cr: 1.5, cw1h: 30 };
+const OPUS_4_5: Price = { in: 5, out: 25, cw: 6.25, cr: 0.5, cw1h: 10 };
+const OPUS_5_5: Price = { in: 4, out: 20, cw: 5, cr: 0.2, cw1h: 8 };
+const SONNET_4: Price = { in: 3, out: 15, cw: 3.75, cr: 0.3, cw1h: 6 };
+const SONNET_5: Price = { in: 2, out: 10, cw: 2.5, cr: 0.2, cw1h: 4 };
+const HAIKU_3_5: Price = { in: 0.8, out: 4, cw: 1, cr: 0.08, cw1h: 1.6 };
+const HAIKU_4_5: Price = { in: 1, out: 5, cw: 1.25, cr: 0.1, cw1h: 2 };
+
+// Each family lists the versions where its price changed, oldest first. A model
+// takes the entry with the highest version at or below its own, so Opus 4.1
+// uses Opus 4 and Opus 5 / 4.6-4.8 use Opus 4.5. A version newer than the list
+// uses the newest entry. Versions older than the first entry (Claude 3 Opus,
+// Claude 3 Haiku, Claude 3.x Sonnet) are not on the current price page and use
+// the generic fallback.
+// Versions are encoded as major * 100 + minor, so 4.10 sorts after 4.9.
+const FABLE_STEPS: [number, Price][] = [[500, FABLE_5], [501, FABLE_5_1]];
+const CLAUDE: Record<string, [version: number, price: Price][]> = {
+  fable: FABLE_STEPS,
+  mythos: FABLE_STEPS, // same tier and prices as Fable
+  opus: [[400, OPUS_4], [405, OPUS_4_5], [505, OPUS_5_5]],
+  sonnet: [[400, SONNET_4], [500, SONNET_5]],
+  haiku: [[305, HAIKU_3_5], [405, HAIKU_4_5]],
+};
+
+// Accepts claude-opus-4-1-20250805, claude-opus-4@20250514, claude-opus-4.6,
+// anthropic.claude-opus-5-5, claude-opus-5-5[1m] and the Claude 3 order
+// (claude-3-5-haiku-20241022). A minor version is one or two digits not
+// followed by another digit, so a date suffix is never read as one.
+const CLAUDE_NEW = /claude-(fable|mythos|opus|sonnet|haiku)(?:-(\d+)(?:[-.](\d{1,2})(?!\d))?)?/;
+const CLAUDE_OLD = /claude-(\d+)(?:[-.](\d))?-(opus|sonnet|haiku)/;
+
+function claudePrice(model: string): Price | null | undefined {
+  let family: string;
+  let version: number | undefined;
+  const n = CLAUDE_NEW.exec(model);
+  const o = n ? null : CLAUDE_OLD.exec(model);
+  if (n) {
+    family = n[1];
+    if (n[2] !== undefined) version = Number(n[2]) * 100 + Number(n[3] ?? 0);
+  } else if (o) {
+    family = o[3];
+    version = Number(o[1]) * 100 + Number(o[2] ?? 0);
+  } else {
+    return undefined; // not a Claude model
+  }
+  const steps = CLAUDE[family];
+  if (version === undefined) return steps[steps.length - 1][1];
+  let hit: Price | null = null;
+  for (const [v, price] of steps) if (v <= version) hit = price;
+  return hit; // null: an older Claude model with no known price
+}
+
 const TABLE: Record<string, Price> = {
-  // Claude (current Opus 4.5/4.6/4.7/4.8 = $5/$25; cw = 1.25x in, cw1h = 2x in, cr = 0.1x in)
-  "claude-fable": { in: 10, out: 50, cw: 12.5, cr: 1.0, cw1h: 20 },
-  "claude-mythos": { in: 10, out: 50, cw: 12.5, cr: 1.0, cw1h: 20 },
-  "claude-opus": { in: 5, out: 25, cw: 6.25, cr: 0.5, cw1h: 10 },
-  "claude-sonnet": { in: 3, out: 15, cw: 3.75, cr: 0.3, cw1h: 6 },
-  "claude-haiku": { in: 1, out: 5, cw: 1.25, cr: 0.1, cw1h: 2 },
   // Official Codex CLI models, including historical GPT-5 variants still
   // present in local logs. Prices are Standard short-context API rates per 1M
   // tokens: https://developers.openai.com/api/docs/pricing
@@ -79,6 +130,8 @@ export function priceFor(model: string, overrides?: Record<string, Price>): Pric
   const override = longestMatch(m, overrides || {});
   if (override) return override;
   if (OPENAI_MODEL_EXCLUSIONS.some((key) => m.includes(key))) return FALLBACK;
+  const claude = claudePrice(m);
+  if (claude !== undefined) return claude ?? FALLBACK;
   return longestMatch(m, TABLE) ?? FALLBACK;
 }
 

@@ -109,12 +109,40 @@ and nothing extra leaves your machine.
 
 Cost is an **estimate** from a built-in per-model price table (USD per 1M tokens:
 `in` input, `out` output, `cw` 5-min cache write, `cr` cache read, `cw1h` 1-hour
-cache write). Defaults track current list prices — current Opus is `$5/$25`, Fable
-5 is `$10/$50`. GPT/Codex entries track the current OpenAI rates, including
+cache write). Defaults track current list prices. Claude models are priced per
+version, because versions within one family no longer share a price. Each model
+takes the price of the nearest listed version at or below its own (Opus 4.1 uses
+the Opus 4 row), and a version newer than the table uses the newest row of its
+family. Hyphenated, dotted, `@`-dated and provider-prefixed ids
+(`claude-opus-4.1`, `claude-opus-4@20250514`, `anthropic.claude-opus-5-5`) resolve
+the same way.
+GPT/Codex entries track the current OpenAI rates, including
 `gpt-5.3-codex`/`gpt-5.2` at `$1.75/$14` and `gpt-5.5` at `$5/$30` (input/output;
 cached input and cache creation are charged separately). Cache reads (the dominant
 cost in agent loops) and the two cache-write tiers Claude reports are all priced
 separately.
+
+Built-in Claude rates, checked against
+[Claude API pricing](https://platform.claude.com/docs/en/about-claude/pricing)
+on 2026-10-06 (USD per 1M tokens):
+
+| Model | Input | Cache read | 5m / 1h cache write | Output |
+| --- | ---: | ---: | ---: | ---: |
+| `claude-fable-5-1` / `claude-mythos-5-1` | $10.00 | $0.25 | $12.50 / $20.00 | $50.00 |
+| `claude-fable-5` / `claude-mythos-5` | $10.00 | $1.00 | $12.50 / $20.00 | $50.00 |
+| `claude-opus-5-5` | $4.00 | $0.20 | $5.00 / $8.00 | $20.00 |
+| `claude-opus-5`, `claude-opus-4-5` – `4-8` | $5.00 | $0.50 | $6.25 / $10.00 | $25.00 |
+| `claude-opus-4-1`, `claude-opus-4` | $15.00 | $1.50 | $18.75 / $30.00 | $75.00 |
+| `claude-sonnet-5-5` / `claude-sonnet-5` | $2.00 | $0.20 | $2.50 / $4.00 | $10.00 |
+| `claude-sonnet-4`, `4-5`, `4-6` | $3.00 | $0.30 | $3.75 / $6.00 | $15.00 |
+| `claude-haiku-4-5` | $1.00 | $0.10 | $1.25 / $2.00 | $5.00 |
+| `claude-3-5-haiku` | $0.80 | $0.08 | $1.00 / $1.60 | $4.00 |
+
+Claude 4.6 and later bill the full 1M context at the standard rate. Earlier
+models charged a premium above 200K input tokens; ccmap does not apply it, so
+long-context sessions on those models are estimated low. Batch, fast-mode and
+data-residency multipliers are not applied. Claude 3 models other than Haiku 3.5
+are not on the current price page and use the generic `$3/$15` fallback.
 
 Sources: [OpenAI API pricing](https://developers.openai.com/api/docs/pricing),
 [GPT-5.3-Codex](https://developers.openai.com/api/docs/models/gpt-5.3-codex), and
@@ -174,10 +202,12 @@ takes precedence over built-in rates and is used as a flat rate without the
 off-peak discount. For example, a custom provider can be configured with
 `"pricing": { "my-model": { "in": 1, "out": 2, "cr": 0.1, "cw": 0 } }`.
 
-Override any model in `~/.ccmap/config.json`:
+Override any model in `~/.ccmap/config.json`. Override keys match as substrings
+of the model id and the longest key wins, so `claude-opus-5` also covers
+`claude-opus-5-5` unless that has its own key:
 
 ```json
-{ "pricing": { "claude-opus": { "in": 5, "out": 25, "cw": 6.25, "cr": 0.5, "cw1h": 10 } } }
+{ "pricing": { "claude-opus-5-5": { "in": 4, "out": 20, "cw": 5, "cr": 0.2, "cw1h": 8 } } }
 ```
 
 ## Updating

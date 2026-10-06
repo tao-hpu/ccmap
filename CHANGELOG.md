@@ -6,6 +6,31 @@ package version (each release is tagged `vX.Y.Z` in git).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-06
+
+### Changed
+
+- **Claude models are priced per version.** The built-in table used one price
+  per family, which no longer holds: Opus 5.5 ($4/$20), Sonnet 5 and 5.5
+  ($2/$10) and the Fable/Mythos 5.1 cache-read rate ($0.25) differed from the
+  family price. Prices now follow every Claude version on the official pricing
+  page (checked 2026-10-06). A model id is parsed into family and version and
+  takes the nearest listed version at or below it; a version released after
+  this table takes the newest rate of its family. Dotted (`claude-opus-4.1`),
+  `@`-dated (`claude-opus-4@20250514`) and provider-prefixed ids resolve the
+  same way as the hyphenated form.
+- Retired Opus 4.1 and Opus 4 are now priced at $15/$75 (previously the $5/$25
+  family rate), and Claude Haiku 3.5 at $0.80/$4. Other Claude 3 models are not
+  on the current price page and keep the generic $3/$15 fallback.
+- Cost estimates drop for most recent Claude usage; on one 30-day sample of
+  Opus 5 / Opus 5.5 / Fable 5.1 logs the estimate fell by 28%. A day whose
+  logs are all still on disk is re-priced on the next scan. A day that Claude
+  Code has fully or partly pruned keeps the cost recorded in
+  `~/.ccmap/history.json`, since the rollup stores no per-category token
+  breakdown to re-price from.
+- User `pricing` overrides keyed on a family (e.g. `claude-opus`) still take
+  precedence over every built-in version entry.
+
 ## [0.3.0] — 2026-09-18
 
 ### Added
@@ -334,6 +359,7 @@ First public release.
 - Only per-day token/cost counts and model names ever leave the machine — never
   prompts, code, or project names.
 
+[0.4.0]: https://github.com/tao-hpu/ccmap/releases/tag/v0.4.0
 [0.3.0]: https://github.com/tao-hpu/ccmap/releases/tag/v0.3.0
 [0.2.0]: https://github.com/tao-hpu/ccmap/releases/tag/v0.2.0
 [0.1.16]: https://github.com/tao-hpu/ccmap/releases/tag/v0.1.16

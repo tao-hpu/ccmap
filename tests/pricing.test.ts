@@ -98,3 +98,77 @@ test("config pricing overrides take precedence over built-in prices", () => {
     9
   );
 });
+
+test("prices each Claude version at its own list rate", () => {
+  // [in, out, 5m cache write, cache read, 1h cache write]
+  const prices: Record<string, [number, number, number, number, number]> = {
+    "claude-fable-5-1": [10, 50, 12.5, 0.25, 20],
+    "claude-fable-5": [10, 50, 12.5, 1, 20],
+    "claude-mythos-5-1": [10, 50, 12.5, 0.25, 20],
+    "claude-mythos-5": [10, 50, 12.5, 1, 20],
+    "claude-opus-5-5": [4, 20, 5, 0.2, 8],
+    "claude-opus-5": [5, 25, 6.25, 0.5, 10],
+    "claude-opus-4-8": [5, 25, 6.25, 0.5, 10],
+    "claude-opus-4-7": [5, 25, 6.25, 0.5, 10],
+    "claude-opus-4-6": [5, 25, 6.25, 0.5, 10],
+    "claude-opus-4-5-20251101": [5, 25, 6.25, 0.5, 10],
+    "claude-opus-4-1-20250805": [15, 75, 18.75, 1.5, 30],
+    "claude-opus-4-0": [15, 75, 18.75, 1.5, 30],
+    "claude-opus-4-20250514": [15, 75, 18.75, 1.5, 30],
+    "claude-sonnet-5-5": [2, 10, 2.5, 0.2, 4],
+    "claude-sonnet-5": [2, 10, 2.5, 0.2, 4],
+    "claude-sonnet-4-6": [3, 15, 3.75, 0.3, 6],
+    "claude-sonnet-4-5-20250929": [3, 15, 3.75, 0.3, 6],
+    "claude-sonnet-4-20250514": [3, 15, 3.75, 0.3, 6],
+    "claude-haiku-4-5-20251001": [1, 5, 1.25, 0.1, 2],
+    "claude-3-5-haiku-20241022": [0.8, 4, 1, 0.08, 1.6],
+  };
+  for (const [model, [input, output, cw, cr, cw1h]] of Object.entries(prices)) {
+    assert.deepEqual(priceFor(model), { in: input, out: output, cw, cr, cw1h }, model);
+  }
+});
+
+test("prices unknown Claude versions at the newest rate of their family", () => {
+  assert.deepEqual(priceFor("claude-opus-6"), priceFor("claude-opus-5-5"));
+  assert.deepEqual(priceFor("claude-sonnet-6"), priceFor("claude-sonnet-5-5"));
+  assert.deepEqual(priceFor("claude-fable-6"), priceFor("claude-fable-5-1"));
+});
+
+test("matches provider-prefixed Claude model ids", () => {
+  assert.deepEqual(priceFor("anthropic.claude-opus-5-5"), priceFor("claude-opus-5-5"));
+  assert.deepEqual(priceFor("us.anthropic.claude-opus-4-1-20250805-v1:0"), priceFor("claude-opus-4-1"));
+});
+
+test("resolves Claude ids in provider and dotted forms by version", () => {
+  const cases: Record<string, string> = {
+    "claude-opus-4": "claude-opus-4-0",
+    "claude-opus-4@20250514": "claude-opus-4-0",
+    "claude-opus-4.1": "claude-opus-4-1",
+    "claude-opus-4.6": "claude-opus-4-6",
+    "claude-fable-5.1": "claude-fable-5-1",
+    "claude-opus-5-5[1m]": "claude-opus-5-5",
+    "claude-sonnet-4-5@20250929": "claude-sonnet-4-5",
+  };
+  for (const [model, same] of Object.entries(cases)) {
+    assert.deepEqual(priceFor(model), priceFor(same), model);
+  }
+});
+
+test("prices a newer minor version at the newest known rate, not an older prefix", () => {
+  assert.deepEqual(priceFor("claude-fable-5-2"), priceFor("claude-fable-5-1"));
+  assert.deepEqual(priceFor("claude-opus-5-6"), priceFor("claude-opus-5-5"));
+  assert.deepEqual(priceFor("claude-opus-4-10"), priceFor("claude-opus-4-5"));
+  assert.deepEqual(priceFor("claude-opus"), priceFor("claude-opus-5-5"));
+});
+
+test("leaves Claude models older than the price page on the generic fallback", () => {
+  const fallback = { in: 3, out: 15, cw: 3.75, cr: 0.3, cw1h: 6 };
+  for (const model of ["claude-3-opus-20240229", "claude-3-haiku-20240307", "claude-3-7-sonnet-20250219"]) {
+    assert.deepEqual(priceFor(model), fallback, model);
+  }
+});
+
+test("user overrides keyed on a Claude family beat built-in versions", () => {
+  const own: Price = { in: 1, out: 1, cw: 1, cr: 1, cw1h: 1 };
+  assert.deepEqual(priceFor("claude-opus-5-5", { "claude-opus": own }), own);
+});
