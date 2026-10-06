@@ -6,6 +6,8 @@ package version (each release is tagged `vX.Y.Z` in git).
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-10-06
+
 ### Changed
 
 - Prices checked against the official pages on 2026-10-06.
