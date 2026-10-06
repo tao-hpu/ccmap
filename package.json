@@ -17,6 +17,10 @@
     "prepublishOnly": "tsc",
     "release": "set -a && . ./.env && set +a && npm publish --access public"
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "engines": {
     "node": ">=18"
   },
