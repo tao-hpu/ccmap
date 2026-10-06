@@ -146,7 +146,8 @@ are not on the current price page and use the generic `$3/$15` fallback.
 
 Sources: [OpenAI API pricing](https://developers.openai.com/api/docs/pricing),
 [GPT-5.3-Codex](https://developers.openai.com/api/docs/models/gpt-5.3-codex), and
-[GPT-5.2-Codex](https://developers.openai.com/api/docs/models/gpt-5.2-codex).
+[GPT-5.2-Codex](https://developers.openai.com/api/docs/models/gpt-5.2-codex),
+checked on 2026-10-06.
 The values below use the Standard short-context API rate; requests over 272K input
 tokens can have higher long-context rates that ccmap does not currently apply.
 
@@ -156,6 +157,9 @@ are (USD per 1M tokens):
 | Model | Input | Cached input | Cache writes | Output |
 | --- | ---: | ---: | ---: | ---: |
 | `gpt-6-astra` | $10.00 | $1.00 | $12.50 | $50.00 |
+| `gpt-6.1-sol` | $2.00 | $0.10 | $2.50 | $10.00 |
+| `gpt-6-sol` | $2.00 | $0.20 | $2.50 | $10.00 |
+| `gpt-6-luna` | $0.10 | $0.01 | $0.125 | $0.50 |
 | `gpt-5.6-sol` | $4.00 | $0.40 | $5.00 | $20.00 |
 | `gpt-5.6-terra` | $2.00 | $0.20 | $2.50 | $12.00 |
 | `gpt-5.6-luna` | $0.20 | $0.02 | $0.25 | $1.20 |
@@ -176,7 +180,14 @@ Grok is the exception: its CLI records what it actually billed for each turn, so
 ccmap uses that number instead of estimating. It accounts for backend search and
 tool calls that a token count alone can't, which is why Grok's cost per token can
 look higher than the table would suggest. The Grok entries in the table are only
-a fallback for turns that logged tokens without a cost.
+a fallback for turns that logged tokens without a cost. They use the rates under
+200K prompt tokens from [xAI's model pages](https://docs.x.ai/developers/models),
+checked on 2026-10-06 (USD per 1M tokens; cache writes are billed as input):
+
+| Model | Input | Cached input | Output |
+| --- | ---: | ---: | ---: |
+| `grok-4.7` / `grok-4.6` | $2.00 | $0.50 | $6.00 |
+| `grok-4.5` | $2.00 | $0.30 | $6.00 |
 
 DeepSeek Harness uses a **current-price estimate**, not a reconstruction of
 historical invoices. The built-in USD rates, checked against

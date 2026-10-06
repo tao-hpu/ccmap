@@ -27,6 +27,9 @@ test("matches Codex model prices before the gpt-5 fallback", () => {
 test("matches the built-in Codex price table", () => {
   const prices: Record<string, [number, number, number, number]> = {
     "gpt-6-astra": [10, 1, 12.5, 50],
+    "gpt-6.1-sol": [2, 0.1, 2.5, 10],
+    "gpt-6-sol": [2, 0.2, 2.5, 10],
+    "gpt-6-luna": [0.1, 0.01, 0.125, 0.5],
     "gpt-5.6-sol": [4, 0.4, 5, 20],
     "gpt-5.6-terra": [2, 0.2, 2.5, 12],
     "gpt-5.6-luna": [0.2, 0.02, 0.25, 1.2],
@@ -41,6 +44,21 @@ test("matches the built-in Codex price table", () => {
     assert.deepEqual(
       priceFor(model),
       { in: input, out: output, cw: writes, cr: cached, cw1h: writes },
+      model
+    );
+  }
+});
+
+test("matches the built-in Grok price table", () => {
+  const prices: Record<string, [number, number, number]> = {
+    "grok-4.7": [2, 0.5, 6],
+    "grok-4.6": [2, 0.5, 6],
+    "grok-4.5": [2, 0.3, 6],
+  };
+  for (const [model, [input, cached, output]] of Object.entries(prices)) {
+    assert.deepEqual(
+      priceFor(model),
+      { in: input, out: output, cw: input, cr: cached, cw1h: input },
       model
     );
   }

@@ -81,8 +81,8 @@ test("a turn with no reported cost falls back to the price table", () => {
   session(root, [turn("p1", usage({ costUsdTicks: undefined }))]);
   const r = scan({ deepseekDir: empty, claudeDir: empty, codexDir: empty, grokDir: root });
   assert.equal(r.totalTokens, 1100);
-  // grok-4.5: 200 fresh in @ $5/M + 100 out @ $25/M + 800 cache read @ $1.25/M
-  assert.ok(Math.abs(r.totalCost - (200 * 5 + 100 * 25 + 800 * 1.25) / 1e6) < 1e-9, `got ${r.totalCost}`);
+  // grok-4.5: 200 fresh in @ $2/M + 100 out @ $6/M + 800 cache read @ $0.30/M
+  assert.ok(Math.abs(r.totalCost - (200 * 2 + 100 * 6 + 800 * 0.3) / 1e6) < 1e-9, `got ${r.totalCost}`);
 });
 
 test("cancelled turns (no usage) are skipped", () => {

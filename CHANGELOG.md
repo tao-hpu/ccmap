@@ -6,6 +6,17 @@ package version (each release is tagged `vX.Y.Z` in git).
 
 ## [Unreleased]
 
+### Changed
+
+- Prices checked against the official pages on 2026-10-06.
+- Codex: added `gpt-6.1-sol` ($2 input / $0.10 cached input / $2.50 cache
+  write / $10 output), `gpt-6-sol` ($2 / $0.20 / $2.50 / $10) and `gpt-6-luna`
+  ($0.10 / $0.01 / $0.125 / $0.50). They previously used the generic $3/$15
+  fallback.
+- Grok: `grok-4.6` output $10 → $6; `grok-4.5` input $5 → $2, cached input
+  $1.25 → $0.30, output $25 → $6; added `grok-4.7` ($2 / $0.50 / $6). These
+  rates apply only to turns the Grok CLI logged without a billed cost.
+
 ## [0.4.0] — 2026-10-06
 
 ### Changed
