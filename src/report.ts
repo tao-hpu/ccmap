@@ -286,24 +286,43 @@ function engineSplitLabel(src: ReportData["totals"]["bySource"]): string {
   return used.length > 1 ? used.join(" vs ") : "Engine split";
 }
 
+function sharePercent(value: number, total: number): string {
+  const pct = (value / total) * 100;
+  // Keep small, nonzero shares distinct from unused engines and full circles.
+  if (pct > 0 && pct < 0.1) return "<0.1%";
+  if (pct > 99.9 && pct < 100) return ">99.9%";
+  return `${Number(pct.toFixed(1))}%`;
+}
+
 function donut(parts: [string, number, string][], c: ReturnType<typeof resolveTheme>): string {
   const total = parts.reduce((s, p) => s + p[1], 0) || 1;
-  const D = 200, cx = D / 2, cy = D / 2, r = 78, sw = 30, C = 2 * Math.PI * r;
+  const D = 200, cx = D / 2, cy = D / 2, r = 78, sw = 30;
+  const point = (fraction: number): string => {
+    const angle = fraction * 2 * Math.PI - Math.PI / 2;
+    return `${cx + r * Math.cos(angle)} ${cy + r * Math.sin(angle)}`;
+  };
   let off = 0;
   const rings = parts
     .map(([label, v, color]) => {
-      const frac = v / total, len = frac * C;
-      const el = `<circle class="arc" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"><title>${esc(label)}: ${((frac) * 100).toFixed(1)}% · ${fmt(v)}</title></circle>`;
-      off += len;
-      return el;
+      if (v <= 0) return "";
+      const title = `<title>${esc(label)}: ${esc(sharePercent(v, total))} · ${fmt(v)}</title>`;
+      const style = `class="arc" fill="none" stroke="${color}" stroke-width="${sw}"`;
+      // A full circle needs its own shape: an SVG arc with identical endpoints is empty.
+      if (v === total) return `<circle ${style} cx="${cx}" cy="${cy}" r="${r}">${title}</circle>`;
+      const start = point(off / total);
+      off += v;
+      const end = point(off === total ? 0 : off / total);
+      // Open arcs avoid the tiny wrapped dash at a closed circle's seam, which can
+      // produce spikes when the browser strokes a very short segment.
+      return `<path ${style} stroke-linecap="butt" d="M ${start} A ${r} ${r} 0 ${v / total > 0.5 ? 1 : 0} 1 ${end}">${title}</path>`;
     })
     .join("");
   const top = parts.slice().sort((a, b) => b[1] - a[1])[0];
-  const topPct = ((top[1] / total) * 100).toFixed(0);
+  const topPct = sharePercent(top[1], total);
   const legend = parts
-    .map(([label, v, color]) => `<span><i style="background:${color}"></i>${esc(label)} · ${((v / total) * 100).toFixed(0)}% · ${fmt(v)}</span>`)
+    .map(([label, v, color]) => `<span><i style="background:${color}"></i>${esc(label)} · ${esc(sharePercent(v, total))} · ${fmt(v)}</span>`)
     .join("");
-  return `<div class="donut"><svg viewBox="0 0 ${D} ${D}" width="${D}" height="${D}" style="max-width:100%">${rings}<text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="34" font-weight="800" fill="${c.text}">${topPct}%</text><text x="${cx}" y="${cy + 20}" text-anchor="middle" font-size="14" fill="${c.sub}">${esc(top[0])}</text></svg><div class="donut-legend">${legend}</div></div>`;
+  return `<div class="donut"><svg viewBox="0 0 ${D} ${D}" width="${D}" height="${D}" style="max-width:100%">${rings}<text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="34" font-weight="800" fill="${c.text}">${esc(topPct)}</text><text x="${cx}" y="${cy + 20}" text-anchor="middle" font-size="14" fill="${c.sub}">${esc(top[0])}</text></svg><div class="donut-legend">${legend}</div></div>`;
 }
 
 // Cumulative token total over the whole window — an area/line trajectory.
@@ -726,8 +745,8 @@ ${ogTags}
   .card svg rect:not(.bar):not(.band).cm-active{stroke:var(--fg);stroke-width:1.4px;paint-order:stroke}
   .bar{transition:filter .1s}
   .bar.cm-active{filter:brightness(1.3)}
-  .arc{transition:stroke-width .12s ease}
-  .arc.cm-active{stroke-width:38}
+  .arc{transition:stroke-width .12s ease,filter .12s ease}
+  .arc.cm-active{stroke-width:38;filter:brightness(1.15)}
   .dot{transition:transform .12s ease,filter .12s ease;transform-box:fill-box;transform-origin:center}
   .hit.cm-active + .dot{transform:scale(2);filter:brightness(1.3)}
   .crosshair{opacity:0;transition:opacity .08s}
