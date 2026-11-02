@@ -6,6 +6,17 @@ package version (each release is tagged `vX.Y.Z` in git).
 
 ## [Unreleased]
 
+## [0.4.3] — 2026-11-02
+
+### Changed
+
+- Prices checked against the official pages on 2026-11-02.
+- Codex: added `gpt-6.1-terra` ($1 input / $0.05 cached input / $1.25 cache
+  write / $5 output). It previously used the generic $3/$15 fallback
+  (input $3 → $1, cached input $0.30 → $0.05, cache write $3.75 → $1.25,
+  output $15 → $5).
+- Claude, Grok and DeepSeek prices are unchanged.
+
 ## [0.4.2] — 2026-10-12
 
 ### Changed

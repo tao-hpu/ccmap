@@ -124,7 +124,7 @@ separately.
 
 Built-in Claude rates, checked against
 [Claude API pricing](https://platform.claude.com/docs/en/about-claude/pricing)
-on 2026-10-12 (USD per 1M tokens):
+on 2026-11-02 (USD per 1M tokens):
 
 | Model | Input | Cache read | 5m / 1h cache write | Output |
 | --- | ---: | ---: | ---: | ---: |
@@ -151,7 +151,7 @@ other than Haiku 3.5 are not on the current price page and use the generic
 Sources: [OpenAI API pricing](https://developers.openai.com/api/docs/pricing),
 [GPT-5.3-Codex](https://developers.openai.com/api/docs/models/gpt-5.3-codex), and
 [GPT-5.2-Codex](https://developers.openai.com/api/docs/models/gpt-5.2-codex),
-checked on 2026-10-12.
+checked on 2026-11-02.
 The values below use the Standard short-context API rate; requests over 272K input
 tokens can have higher long-context rates that ccmap does not currently apply.
 
@@ -162,6 +162,7 @@ are (USD per 1M tokens):
 | --- | ---: | ---: | ---: | ---: |
 | `gpt-6-astra` | $10.00 | $1.00 | $12.50 | $50.00 |
 | `gpt-6.1-sol` | $2.00 | $0.10 | $2.50 | $10.00 |
+| `gpt-6.1-terra` | $1.00 | $0.05 | $1.25 | $5.00 |
 | `gpt-6-sol` | $2.00 | $0.20 | $2.50 | $10.00 |
 | `gpt-6-luna` | $0.10 | $0.01 | $0.125 | $0.50 |
 | `gpt-5.6-sol` | $4.00 | $0.40 | $5.00 | $20.00 |
@@ -186,7 +187,7 @@ tool calls that a token count alone can't, which is why Grok's cost per token ca
 look higher than the table would suggest. The Grok entries in the table are only
 a fallback for turns that logged tokens without a cost. They use the rates under
 200K prompt tokens from [xAI's model pages](https://docs.x.ai/developers/models),
-checked on 2026-10-12 (USD per 1M tokens; cache writes are billed as input):
+checked on 2026-11-02 (USD per 1M tokens; cache writes are billed as input):
 
 | Model | Input | Cached input | Output |
 | --- | ---: | ---: | ---: |

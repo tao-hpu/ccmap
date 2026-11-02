@@ -10,7 +10,7 @@ export interface Price {
 }
 
 // Claude list prices: https://platform.claude.com/docs/en/about-claude/pricing
-// (checked 2026-10-12). cw = 1.25x in, cw1h = 2x in; cr = 0.1x in except
+// (checked 2026-11-02). cw = 1.25x in, cw1h = 2x in; cr = 0.1x in except
 // Fable/Mythos 5.1 (0.025x) and Opus 5.5 / Sonnet 5.5 (0.05x). Haiku 5.5 uses
 // the rate for prompts up to 100K tokens; prompts above it cost 5x and are not
 // applied.
@@ -73,12 +73,13 @@ function claudePrice(model: string): Price | null | undefined {
 const TABLE: Record<string, Price> = {
   // Official Codex CLI models, including historical GPT-5 variants still
   // present in local logs. Prices are Standard short-context API rates per 1M
-  // tokens: https://developers.openai.com/api/docs/pricing (checked 2026-10-12)
+  // tokens: https://developers.openai.com/api/docs/pricing (checked 2026-11-02)
   // GPT-5.3/5.2 Codex rates: https://developers.openai.com/api/docs/models/gpt-5.3-codex
   // and https://developers.openai.com/api/docs/models/gpt-5.2-codex
   // Codex does not report separate cache-write TTL tiers, so cw1h matches cw.
   "gpt-6-astra": { in: 10, out: 50, cw: 12.5, cr: 1, cw1h: 12.5 },
   "gpt-6.1-sol": { in: 2, out: 10, cw: 2.5, cr: 0.1, cw1h: 2.5 },
+  "gpt-6.1-terra": { in: 1, out: 5, cw: 1.25, cr: 0.05, cw1h: 1.25 },
   "gpt-6-sol": { in: 2, out: 10, cw: 2.5, cr: 0.2, cw1h: 2.5 },
   "gpt-6-luna": { in: 0.1, out: 0.5, cw: 0.125, cr: 0.01, cw1h: 0.125 },
   "gpt-5.6-sol": { in: 4, out: 20, cw: 5, cr: 0.4, cw1h: 5 },
@@ -98,7 +99,7 @@ const TABLE: Record<string, Price> = {
   // per turn and we use that when present, so these only cover turns that
   // logged tokens without a cost (interrupted turns, older CLI builds).
   // Rates under 200K prompt tokens from https://docs.x.ai/developers/models
-  // (checked 2026-10-12). xAI lists no cache-write price, so cw = in.
+  // (checked 2026-11-02). xAI lists no cache-write price, so cw = in.
   "grok-4.7": { in: 2, out: 6, cw: 2, cr: 0.5, cw1h: 2 },
   "grok-4.6": { in: 2, out: 6, cw: 2, cr: 0.5, cw1h: 2 },
   "grok-4.5": { in: 2, out: 6, cw: 2, cr: 0.3, cw1h: 2 },
